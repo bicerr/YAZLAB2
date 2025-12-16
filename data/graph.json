@@ -1,4 +1,13 @@
 {
-    "nodes": [],
+    "nodes": [
+        {
+            "id": 5,
+            "name": "abd\u00fcl",
+            "aktiflik": 0.5,
+            "etkilesim": 10,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        }
+    ],
     "edges": []
 }
