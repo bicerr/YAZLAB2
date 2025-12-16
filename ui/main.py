@@ -1,12 +1,23 @@
 import sys
+import os
+
+
+# Proje kök dizinini path'e ekle
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+from ui.src.graph import Graph
+from ui.src.node import Node
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QDialog
 )
 
-from src.graph import Graph
-from src.node import Node
+from ui.src.graph import Graph
+from ui.src.node import Node
+
 
 
 # =========================
