@@ -1,4 +1,13 @@
 {
-    "nodes": [],
+    "nodes": [
+        {
+            "id": 1,
+            "name": "Bekir ",
+            "aktiflik": 0.8,
+            "etkilesim": 12,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        }
+    ],
     "edges": []
 }
