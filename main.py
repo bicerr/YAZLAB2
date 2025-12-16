@@ -1,9 +1,10 @@
-import os
-print("CALISAN DOSYA:", os.path.abspath(__file__))
-print(">>> GUNCEL MAIN.PY CALISIYOR <<<")
+import sys
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget,
+    QPushButton, QVBoxLayout, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QDialog
+)
 
-import tkinter as tk
-from tkinter import messagebox
 from src.graph import Graph
 from src.node import Node
 
