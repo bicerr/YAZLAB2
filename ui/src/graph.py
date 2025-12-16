@@ -1,6 +1,6 @@
 import json
-from src.node import Node
-from src.edge import Edge
+from .node import Node
+from .edge import Edge
 
 
 class Graph:

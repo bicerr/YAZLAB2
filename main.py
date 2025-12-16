@@ -4,8 +4,9 @@ print(">>> GUNCEL MAIN.PY CALISIYOR <<<")
 
 import tkinter as tk
 from tkinter import messagebox
-from src.graph import Graph
-from src.node import Node
+
+from ui.src.graph import Graph
+from ui.src.node import Node
 
 # =========================
 # GRAPH NESNESİ
