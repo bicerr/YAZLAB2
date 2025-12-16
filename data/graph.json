@@ -1,31 +1,4 @@
 {
-    "nodes": [
-        {
-            "id": 1,
-            "name": "Ahmet",
-            "aktiflik": 0.8,
-            "etkilesim": 12,
-            "baglanti_sayisi": 1,
-            "komsular": [
-                2
-            ]
-        },
-        {
-            "id": 2,
-            "name": "Mehmet",
-            "aktiflik": 0.4,
-            "etkilesim": 5,
-            "baglanti_sayisi": 1,
-            "komsular": [
-                1
-            ]
-        }
-    ],
-    "edges": [
-        {
-            "from": 1,
-            "to": 2,
-            "weight": 0.019936204146730464
-        }
-    ]
+    "nodes": [],
+    "edges": []
 }
