@@ -4,136 +4,134 @@ print(">>> GUNCEL MAIN.PY CALISIYOR <<<")
 
 import tkinter as tk
 from tkinter import messagebox
+from src.graph import Graph
+from src.node import Node
 
-from ui.src.graph import Graph
-from ui.src.node import Node
-
-# =========================
-# GRAPH NESNESİ
-# =========================
-graph = Graph()
 
 # =========================
-# ANA PENCERE
+# NODE EKLE DIALOG
 # =========================
-root = tk.Tk()
-root.title("Sosyal Ağ Analizi Uygulaması")
-root.geometry("1000x600")
+class AddNodeDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Node Ekle")
+        self.setFixedSize(350, 300)
 
-# =========================
-# NODE EKLE POPUP (SON & NET)
-# =========================
-def open_add_node_popup():
-    print("NODE POPUP ACILDI")
+        layout = QVBoxLayout()
 
-    popup = tk.Toplevel(root)
-    popup.title("Node Ekle")
-    popup.geometry("400x420")
-    popup.minsize(400, 420)
-    popup.grab_set()
-    popup.configure(bg="#f2f2f2")
+        self.id_input = QLineEdit()
+        self.name_input = QLineEdit()
+        self.aktiflik_input = QLineEdit()
+        self.etkilesim_input = QLineEdit()
 
-    # ---- INPUTLAR ----
-    tk.Label(popup, text="Node ID", bg="#f2f2f2").pack(anchor="w", padx=20, pady=(20, 0))
-    entry_id = tk.Entry(popup, width=35)
-    entry_id.pack(padx=20, pady=5)
+        layout.addWidget(QLabel("Node ID"))
+        layout.addWidget(self.id_input)
 
-    tk.Label(popup, text="İsim", bg="#f2f2f2").pack(anchor="w", padx=20, pady=(10, 0))
-    entry_name = tk.Entry(popup, width=35)
-    entry_name.pack(padx=20, pady=5)
+        layout.addWidget(QLabel("İsim"))
+        layout.addWidget(self.name_input)
 
-    tk.Label(popup, text="Aktiflik (0-1)", bg="#f2f2f2").pack(anchor="w", padx=20, pady=(10, 0))
-    entry_aktiflik = tk.Entry(popup, width=35)
-    entry_aktiflik.pack(padx=20, pady=5)
+        layout.addWidget(QLabel("Aktiflik (0-1)"))
+        layout.addWidget(self.aktiflik_input)
 
-    tk.Label(popup, text="Etkileşim", bg="#f2f2f2").pack(anchor="w", padx=20, pady=(10, 0))
-    entry_etkilesim = tk.Entry(popup, width=35)
-    entry_etkilesim.pack(padx=20, pady=5)
+        layout.addWidget(QLabel("Etkileşim"))
+        layout.addWidget(self.etkilesim_input)
 
-    # ---- NODE EKLE AKSİYONU ----
-    def add_node_action():
+        btn_add = QPushButton("Ekle")
+        btn_add.clicked.connect(self.add_node)
+
+        layout.addWidget(btn_add)
+        self.setLayout(layout)
+
+    def add_node(self):
         try:
             if not all([
-                entry_id.get().strip(),
-                entry_name.get().strip(),
-                entry_aktiflik.get().strip(),
-                entry_etkilesim.get().strip()
+                self.id_input.text().strip(),
+                self.name_input.text().strip(),
+                self.aktiflik_input.text().strip(),
+                self.etkilesim_input.text().strip()
             ]):
                 raise ValueError("Tüm alanlar doldurulmalıdır.")
 
-            node_id = int(entry_id.get())
-            aktiflik = float(entry_aktiflik.get())
-            etkilesim = int(entry_etkilesim.get())
+            node_id = int(self.id_input.text())
+            aktiflik = float(self.aktiflik_input.text())
+            etkilesim = int(self.etkilesim_input.text())
 
             if not (0 <= aktiflik <= 1):
                 raise ValueError("Aktiflik 0 ile 1 arasında olmalı.")
 
             node = Node(
                 node_id,
-                entry_name.get(),
+                self.name_input.text(),
                 aktiflik,
                 etkilesim,
                 0,
                 []
             )
 
-            graph.add_node(node)
-            messagebox.showinfo("Başarılı", "Node başarıyla eklendi.")
-            popup.destroy()
+            self.graph.add_node(node)
+            QMessageBox.information(self, "Başarılı", "Node başarıyla eklendi.")
+            self.accept()
 
         except Exception as e:
-            messagebox.showerror("Hata", str(e))
+            QMessageBox.critical(self, "Hata", str(e))
 
-    tk.Button(popup, text="Ekle", command=add_node_action).pack(pady=25)
-
-# =========================
-# SOL PANEL (KONTROLLER)
-# =========================
-left_frame = tk.Frame(root, width=250, bg="#f0f0f0")
-left_frame.pack(side=tk.LEFT, fill=tk.Y)
-
-tk.Label(
-    left_frame,
-    text="Kontrol Paneli",
-    font=("Arial", 14, "bold"),
-    bg="#f0f0f0"
-).pack(pady=10)
-
-tk.Button(
-    left_frame,
-    text="Node Ekle",
-    command=open_add_node_popup
-).pack(fill=tk.X, padx=10, pady=5)
-
-tk.Button(left_frame, text="Edge Ekle").pack(fill=tk.X, padx=10, pady=5)
-tk.Button(left_frame, text="BFS Çalıştır").pack(fill=tk.X, padx=10, pady=5)
-tk.Button(left_frame, text="DFS Çalıştır").pack(fill=tk.X, padx=10, pady=5)
-
-tk.Button(
-    left_frame,
-    text="JSON Kaydet",
-    command=lambda: graph.save_to_json("data/graph.json")
-).pack(fill=tk.X, padx=10, pady=20)
 
 # =========================
-# SAĞ PANEL (CANVAS)
+# ANA PENCERE
 # =========================
-right_frame = tk.Frame(root, bg="white")
-right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.graph = Graph()
+        self.setWindowTitle("Sosyal Ağ Analizi Uygulaması")
+        self.setFixedSize(1000, 600)
 
-tk.Label(
-    right_frame,
-    text="Graf Çizim Alanı (Canvas)",
-    font=("Arial", 12),
-    bg="white"
-).pack(pady=5)
+        central = QWidget()
+        self.setCentralWidget(central)
 
-tk.Canvas(
-    right_frame,
-    bg="white"
-).pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_layout = QHBoxLayout()
+        left_layout = QVBoxLayout()
+        right_layout = QVBoxLayout()
+
+        btn_add_node = QPushButton("Node Ekle")
+        btn_add_node.clicked.connect(self.open_add_node)
+
+        btn_edge = QPushButton("Edge Ekle")
+        btn_bfs = QPushButton("BFS Çalıştır")
+        btn_dfs = QPushButton("DFS Çalıştır")
+        btn_save = QPushButton("JSON Kaydet")
+        btn_save.clicked.connect(self.save_json)
+
+        left_layout.addWidget(QLabel("Kontrol Paneli"))
+        left_layout.addWidget(btn_add_node)
+        left_layout.addWidget(btn_edge)
+        left_layout.addWidget(btn_bfs)
+        left_layout.addWidget(btn_dfs)
+        left_layout.addWidget(btn_save)
+        left_layout.addStretch()
+
+        right_layout.addWidget(QLabel("Graf Çizim Alanı (Canvas)"))
+
+        main_layout.addLayout(left_layout, 1)
+        main_layout.addLayout(right_layout, 3)
+
+        central.setLayout(main_layout)
+
+    def open_add_node(self):
+        dialog = AddNodeDialog(self.graph)
+        dialog.exec_()
+
+    def save_json(self):
+        self.graph.save_to_json("data/graph.json")
+        QMessageBox.information(self, "Kaydedildi", "Graph JSON dosyasına kaydedildi.")
+
 
 # =========================
-# PROGRAMI BAŞLAT
+# PROGRAM BAŞLAT
 # =========================
-root.mainloop()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
