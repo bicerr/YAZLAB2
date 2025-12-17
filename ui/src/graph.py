@@ -214,26 +214,33 @@ class Graph:
         visited = set()
         components = []
 
+    # Tüm node’ları dolaş (izole node dahil)
         for node in self.nodes:
             if node.id in visited:
                 continue
 
-            # Bu node'dan BFS ile bileşeni bul
-            queue = deque([node.id])
-            visited.add(node.id)
+        # Yeni bileşen başlat
             comp = []
+            stack = [node.id]
+            visited.add(node.id)
 
-            while queue:
-                current_id = queue.popleft()
+            while stack:
+                current_id = stack.pop()
                 comp.append(current_id)
 
                 current_node = self.get_node_by_id(current_id)
-                for komsu_id in current_node.komsular:
-                    if komsu_id not in visited:
-                        visited.add(komsu_id)
-                        queue.append(komsu_id)
+                if current_node is None:
+                    continue
+
+                for nb in current_node.komsular:
+                    if nb not in visited:
+                        visited.add(nb)
+                        stack.append(nb)
 
             components.append(comp)
+
+        return components
+
 
                 # =========================
     # Degree Centrality (Top 5)
@@ -293,6 +300,104 @@ class Graph:
             raise ValueError("Bu iki node arasında yol yok")
 
         return path, distances[end_id]
+    
+        # =========================
+    # A* (A-Star) En Kısa Yol
+    # =========================
+    def heuristic(self, node1: Node, node2: Node):
+        # Basit ve tutarlı heuristic:
+        # Özellik farklarına dayalı tahmin (küçük fark = yakın)
+        return (
+            abs(node1.aktiflik - node2.aktiflik)
+            + abs(node1.etkilesim - node2.etkilesim)
+            + abs(node1.baglanti_sayisi - node2.baglanti_sayisi)
+        )
+
+    def astar(self, start_id, end_id):
+        start_node = self.get_node_by_id(start_id)
+        end_node = self.get_node_by_id(end_id)
+
+        if start_node is None or end_node is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        open_set = {start_id}
+        came_from = {}
+
+        g_score = {node.id: float("inf") for node in self.nodes}
+        f_score = {node.id: float("inf") for node in self.nodes}
+
+        g_score[start_id] = 0
+        f_score[start_id] = self.heuristic(start_node, end_node)
+
+        while open_set:
+            current = min(open_set, key=lambda nid: f_score[nid])
+
+            if current == end_id:
+                # Yol oluştur
+                path = [current]
+                while current in came_from:
+                    current = came_from[current]
+                    path.insert(0, current)
+                return path, g_score[end_id]
+
+            open_set.remove(current)
+            current_node = self.get_node_by_id(current)
+
+            for neighbor_id in current_node.komsular:
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                tentative_g = g_score[current] + self.calculate_weight(
+                    current_node, neighbor_node
+                )
+
+                if tentative_g < g_score[neighbor_id]:
+                    came_from[neighbor_id] = current
+                    g_score[neighbor_id] = tentative_g
+                    f_score[neighbor_id] = tentative_g + self.heuristic(
+                        neighbor_node, end_node
+                    )
+                    open_set.add(neighbor_id)
+
+        raise ValueError("Bu iki node arasında yol yok")
+    
+    # =========================
+    # Welsh–Powell Graph Coloring
+    # =========================
+    def welsh_powell(self):
+        # Node'ları dereceye göre büyükten küçüğe sırala
+        sorted_nodes = sorted(
+            self.nodes,
+            key=lambda n: n.baglanti_sayisi,
+            reverse=True
+        )
+
+        color_of = {}   # node_id -> color_index
+        current_color = 0
+
+        for node in sorted_nodes:
+            if node.id in color_of:
+                continue
+
+            color_of[node.id] = current_color
+
+            for other in sorted_nodes:
+                if other.id in color_of:
+                    continue
+
+                # Komşuların rengiyle çakışıyor mu?
+                conflict = False
+                for komsu in other.komsular:
+                    if color_of.get(komsu) == current_color:
+                        conflict = True
+                        break
+
+                if not conflict:
+                    color_of[other.id] = current_color
+
+            current_color += 1
+
+        return color_of
+
+
 
 
         return components
