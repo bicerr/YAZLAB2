@@ -146,6 +146,9 @@ class MainWindow(QMainWindow):
         btn_top5 = QPushButton("En Etkili 5 Kullanıcı")
         btn_top5.clicked.connect(self.show_top5)
 
+        btn_dijkstra = QPushButton("Dijkstra (En Kısa Yol)")
+        btn_dijkstra.clicked.connect(self.open_dijkstra)
+
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
         left_layout.addWidget(btn_add_edge)
@@ -154,6 +157,8 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(btn_save)
         left_layout.addWidget(btn_cc)
         left_layout.addWidget(btn_top5)
+        left_layout.addWidget(btn_dijkstra)
+
 
 
         left_layout.addStretch()
@@ -173,6 +178,10 @@ class MainWindow(QMainWindow):
 
     def open_add_edge(self):
         AddEdgeDialog(self.graph).exec_()
+
+    def open_dijkstra(self):
+        DijkstraDialog(self.graph).exec_()
+
 
     def run_bfs(self):
         if not self.graph.nodes:
@@ -226,6 +235,49 @@ class MainWindow(QMainWindow):
     def save_json(self):
         self.graph.save_to_json(self.graph.data_path)
         QMessageBox.information(self, "Kaydedildi", "JSON kaydedildi.")
+
+
+class DijkstraDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Dijkstra - En Kısa Yol")
+        self.setFixedSize(300, 200)
+
+        layout = QVBoxLayout()
+
+        self.start_input = QLineEdit()
+        self.end_input = QLineEdit()
+
+        layout.addWidget(QLabel("Başlangıç Node ID"))
+        layout.addWidget(self.start_input)
+
+        layout.addWidget(QLabel("Hedef Node ID"))
+        layout.addWidget(self.end_input)
+
+        btn_run = QPushButton("Hesapla")
+        btn_run.clicked.connect(self.run_dijkstra)
+
+        layout.addWidget(btn_run)
+        self.setLayout(layout)
+
+    def run_dijkstra(self):
+        try:
+            start = int(self.start_input.text())
+            end = int(self.end_input.text())
+
+            path, cost = self.graph.dijkstra(start, end)
+
+            QMessageBox.information(
+                self,
+                "En Kısa Yol",
+                f"Yol: {' -> '.join(map(str, path))}\nToplam Maliyet: {cost:.4f}"
+            )
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+
 
 
 # =========================

@@ -248,6 +248,52 @@ class Graph:
         # ilk 5
         return degrees[:5]
 
+    # =========================
+    # Dijkstra En Kısa Yol
+    # =========================
+    def dijkstra(self, start_id, end_id):
+        if self.get_node_by_id(start_id) is None or self.get_node_by_id(end_id) is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        # Mesafeler
+        distances = {node.id: float("inf") for node in self.nodes}
+        previous = {node.id: None for node in self.nodes}
+
+        distances[start_id] = 0
+        unvisited = set(distances.keys())
+
+        while unvisited:
+            current = min(unvisited, key=lambda node_id: distances[node_id])
+            unvisited.remove(current)
+
+            if current == end_id:
+                break
+
+            current_node = self.get_node_by_id(current)
+            for neighbor_id in current_node.komsular:
+                if neighbor_id not in unvisited:
+                    continue
+
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                weight = self.calculate_weight(current_node, neighbor_node)
+                new_dist = distances[current] + weight
+
+                if new_dist < distances[neighbor_id]:
+                    distances[neighbor_id] = new_dist
+                    previous[neighbor_id] = current
+
+        # Yol oluşturma
+        path = []
+        current = end_id
+        while current is not None:
+            path.insert(0, current)
+            current = previous[current]
+
+        if path[0] != start_id:
+            raise ValueError("Bu iki node arasında yol yok")
+
+        return path, distances[end_id]
+
 
         return components
 
