@@ -206,3 +206,48 @@ class Graph:
 
         print("DFS sonucu:", result)
         return result
+    
+        # =========================
+    # Connected Components
+    # =========================
+    def connected_components(self):
+        visited = set()
+        components = []
+
+        for node in self.nodes:
+            if node.id in visited:
+                continue
+
+            # Bu node'dan BFS ile bileşeni bul
+            queue = deque([node.id])
+            visited.add(node.id)
+            comp = []
+
+            while queue:
+                current_id = queue.popleft()
+                comp.append(current_id)
+
+                current_node = self.get_node_by_id(current_id)
+                for komsu_id in current_node.komsular:
+                    if komsu_id not in visited:
+                        visited.add(komsu_id)
+                        queue.append(komsu_id)
+
+            components.append(comp)
+
+                # =========================
+    # Degree Centrality (Top 5)
+    # =========================
+    def degree_centrality_top5(self):
+        # (node_id, degree) listesi
+        degrees = [(n.id, len(n.komsular)) for n in self.nodes]
+
+        # degree büyükten küçüğe sırala
+        degrees.sort(key=lambda x: x[1], reverse=True)
+
+        # ilk 5
+        return degrees[:5]
+
+
+        return components
+

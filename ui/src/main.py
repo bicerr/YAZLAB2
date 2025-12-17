@@ -140,12 +140,22 @@ class MainWindow(QMainWindow):
         btn_save = QPushButton("JSON Kaydet")
         btn_save.clicked.connect(self.save_json)
 
+        btn_cc = QPushButton("Bileşenleri Bul")
+        btn_cc.clicked.connect(self.show_components)
+
+        btn_top5 = QPushButton("En Etkili 5 Kullanıcı")
+        btn_top5.clicked.connect(self.show_top5)
+
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
         left_layout.addWidget(btn_add_edge)
         left_layout.addWidget(btn_bfs)
         left_layout.addWidget(btn_dfs)
         left_layout.addWidget(btn_save)
+        left_layout.addWidget(btn_cc)
+        left_layout.addWidget(btn_top5)
+
+
         left_layout.addStretch()
 
         right_layout.addWidget(QLabel("Graf Çizim Alanı (Canvas)"))
@@ -189,6 +199,29 @@ class MainWindow(QMainWindow):
             self, "DFS Sonucu",
             " -> ".join(map(str, result))
         )
+    def show_top5(self):
+        top5 = self.graph.degree_centrality_top5()
+
+        if not top5:
+            QMessageBox.information(self, "Sonuç", "Graf boş.")
+            return
+
+        lines = []
+        for i, (node_id, degree) in enumerate(top5, start=1):
+            lines.append(f"{i}. Node ID: {node_id}  |  Derece: {degree}")
+
+        QMessageBox.information(
+            self,
+            "Degree Centrality - Top 5",
+            "\n".join(lines)
+        )
+
+    def show_components(self):
+        comps = self.graph.connected_components()
+        text = "\n".join([f"{i+1}. bileşen: {c}" for i, c in enumerate(comps)])
+
+        QMessageBox.information(self, "Bağlı Bileşenler", text)
+
 
     def save_json(self):
         self.graph.save_to_json(self.graph.data_path)
