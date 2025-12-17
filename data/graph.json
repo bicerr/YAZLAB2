@@ -15,6 +15,62 @@
             "etkilesim": 8,
             "baglanti_sayisi": 0,
             "komsular": []
+        },
+        {
+            "id": 22,
+            "name": "mehmet",
+            "aktiflik": 0.4,
+            "etkilesim": 7,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 15,
+            "name": "ismail",
+            "aktiflik": 0.8,
+            "etkilesim": 12,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 45,
+            "name": "bekir",
+            "aktiflik": 0.2,
+            "etkilesim": 5,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 58,
+            "name": "ahmet",
+            "aktiflik": 0.2,
+            "etkilesim": 5,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 85,
+            "name": "ali",
+            "aktiflik": 0.8,
+            "etkilesim": 15,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 47,
+            "name": "ayşe",
+            "aktiflik": 0.4,
+            "etkilesim": 16,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 25,
+            "name": "isoş",
+            "aktiflik": 0.2,
+            "etkilesim": 4,
+            "baglanti_sayisi": 0,
+            "komsular": []
         }
     ],
     "edges": []

@@ -1,5 +1,6 @@
 import json
 import os
+from collections import deque
 
 from .node import Node
 from .edge import Edge
@@ -10,6 +11,7 @@ class Graph:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self.data_path = data_path or os.path.join(base_dir, "data", "graph.json")
         self.autosave = autosave
+
         self.nodes = []
         self.edges = []
 
@@ -66,9 +68,6 @@ class Graph:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
-    # =========================
-    # INTERNAL AUTOSAVE
-    # =========================
     def _autosave(self):
         if self.autosave and self.data_path:
             self.save_to_json(self.data_path)
@@ -142,13 +141,68 @@ class Graph:
             raise ValueError("Bu edge zaten var")
 
         weight = self.calculate_weight(node1, node2)
-
         self.edges.append(Edge(source_id, target_id, weight))
 
-        node1.komsular.append(target_id)
-        node2.komsular.append(source_id)
+        # komşuluk tekrarını engelle
+        if target_id not in node1.komsular:
+            node1.komsular.append(target_id)
+        if source_id not in node2.komsular:
+            node2.komsular.append(source_id)
 
-        node1.baglanti_sayisi += 1
-        node2.baglanti_sayisi += 1
+        node1.baglanti_sayisi = len(node1.komsular)
+        node2.baglanti_sayisi = len(node2.komsular)
 
         self._autosave()
+
+    # =========================
+    # BFS (Breadth First Search)
+    # =========================
+    def bfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        queue = deque()
+        result = []
+
+        queue.append(start_node_id)
+        visited.add(start_node_id)
+
+        while queue:
+            current_id = queue.popleft()
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    visited.add(komsu_id)
+                    queue.append(komsu_id)
+
+        print("BFS sonucu:", result)
+        return result
+
+    # =========================
+    # DFS (Depth First Search)
+    # =========================
+    def dfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        result = []
+
+        def _dfs(current_id):
+            visited.add(current_id)
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    _dfs(komsu_id)
+
+        _dfs(start_node_id)
+
+        print("DFS sonucu:", result)
+        return result

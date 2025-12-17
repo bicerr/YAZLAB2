@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QMessageBox, QDialog
 )
 
-from .graph import Graph
-from .node import Node
+from ui.src.graph import Graph
+from ui.src.node import Node
 
 
 # =========================
@@ -47,32 +47,59 @@ class AddNodeDialog(QDialog):
 
     def add_node(self):
         try:
-            if not all([
-                self.id_input.text().strip(),
-                self.name_input.text().strip(),
-                self.aktiflik_input.text().strip(),
-                self.etkilesim_input.text().strip()
-            ]):
-                raise ValueError("Tüm alanlar doldurulmalıdır.")
-
             node_id = int(self.id_input.text())
             aktiflik = float(self.aktiflik_input.text())
             etkilesim = int(self.etkilesim_input.text())
-
-            if not (0 <= aktiflik <= 1):
-                raise ValueError("Aktiflik 0 ile 1 arasında olmalı.")
 
             node = Node(
                 node_id,
                 self.name_input.text(),
                 aktiflik,
-                etkilesim,
-                0,
-                []
+                etkilesim
             )
 
             self.graph.add_node(node)
-            QMessageBox.information(self, "Başarılı", "Node başarıyla eklendi.")
+            QMessageBox.information(self, "Başarılı", "Node eklendi.")
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+
+
+# =========================
+# EDGE EKLE DIALOG
+# =========================
+class AddEdgeDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Edge Ekle")
+        self.setFixedSize(300, 180)
+
+        layout = QVBoxLayout()
+
+        self.node1_input = QLineEdit()
+        self.node2_input = QLineEdit()
+
+        layout.addWidget(QLabel("Node 1 ID"))
+        layout.addWidget(self.node1_input)
+
+        layout.addWidget(QLabel("Node 2 ID"))
+        layout.addWidget(self.node2_input)
+
+        btn_add = QPushButton("Ekle")
+        btn_add.clicked.connect(self.add_edge)
+
+        layout.addWidget(btn_add)
+        self.setLayout(layout)
+
+    def add_edge(self):
+        try:
+            n1 = int(self.node1_input.text())
+            n2 = int(self.node2_input.text())
+
+            self.graph.add_edge(n1, n2)
+            QMessageBox.information(self, "Başarılı", "Edge eklendi")
             self.accept()
 
         except Exception as e:
@@ -85,7 +112,9 @@ class AddNodeDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
         self.graph = Graph()
+
         self.setWindowTitle("Sosyal Ağ Analizi Uygulaması")
         self.setFixedSize(1000, 600)
 
@@ -99,15 +128,21 @@ class MainWindow(QMainWindow):
         btn_add_node = QPushButton("Node Ekle")
         btn_add_node.clicked.connect(self.open_add_node)
 
-        btn_edge = QPushButton("Edge Ekle")
+        btn_add_edge = QPushButton("Edge Ekle")
+        btn_add_edge.clicked.connect(self.open_add_edge)
+
         btn_bfs = QPushButton("BFS Çalıştır")
+        btn_bfs.clicked.connect(self.run_bfs)
+
         btn_dfs = QPushButton("DFS Çalıştır")
+        btn_dfs.clicked.connect(self.run_dfs)
+
         btn_save = QPushButton("JSON Kaydet")
         btn_save.clicked.connect(self.save_json)
 
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
-        left_layout.addWidget(btn_edge)
+        left_layout.addWidget(btn_add_edge)
         left_layout.addWidget(btn_bfs)
         left_layout.addWidget(btn_dfs)
         left_layout.addWidget(btn_save)
@@ -120,13 +155,44 @@ class MainWindow(QMainWindow):
 
         central.setLayout(main_layout)
 
+    # =========================
+    # ACTIONS
+    # =========================
     def open_add_node(self):
-        dialog = AddNodeDialog(self.graph)
-        dialog.exec_()
+        AddNodeDialog(self.graph).exec_()
+
+    def open_add_edge(self):
+        AddEdgeDialog(self.graph).exec_()
+
+    def run_bfs(self):
+        if not self.graph.nodes:
+            QMessageBox.warning(self, "Uyarı", "Graf boş.")
+            return
+
+        start = self.graph.nodes[0].id
+        result = self.graph.bfs(start)
+
+        QMessageBox.information(
+            self, "BFS Sonucu",
+            " -> ".join(map(str, result))
+        )
+
+    def run_dfs(self):
+        if not self.graph.nodes:
+            QMessageBox.warning(self, "Uyarı", "Graf boş.")
+            return
+
+        start = self.graph.nodes[0].id
+        result = self.graph.dfs(start)
+
+        QMessageBox.information(
+            self, "DFS Sonucu",
+            " -> ".join(map(str, result))
+        )
 
     def save_json(self):
         self.graph.save_to_json(self.graph.data_path)
-        QMessageBox.information(self, "Kaydedildi", "Graph JSON dosyasına kaydedildi.")
+        QMessageBox.information(self, "Kaydedildi", "JSON kaydedildi.")
 
 
 # =========================
