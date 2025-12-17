@@ -2,24 +2,12 @@
     "nodes": [
         {
             "id": 1,
-            "name": "A",
+            "name": "bekir",
             "aktiflik": 0.5,
             "etkilesim": 10,
             "baglanti_sayisi": 3,
             "komsular": [
-                2,
                 3,
-                4
-            ]
-        },
-        {
-            "id": 2,
-            "name": "B",
-            "aktiflik": 0.4,
-            "etkilesim": 8,
-            "baglanti_sayisi": 2,
-            "komsular": [
-                1,
                 4
             ]
         },
@@ -42,7 +30,6 @@
             "baglanti_sayisi": 3,
             "komsular": [
                 1,
-                2,
                 3
             ]
         },
@@ -58,23 +45,13 @@
     "edges": [
         {
             "from": 1,
-            "to": 2,
-            "weight": 0.1996007984031936
-        },
-        {
-            "from": 1,
             "to": 3,
             "weight": 0.33222591362126247
         },
         {
             "from": 1,
             "to": 4,
-            "weight": 0.047596382674916705
-        },
-        {
-            "from": 2,
-            "to": 4,
-            "weight": 0.1984126984126984
+            "weight": 0.05878894767783656
         },
         {
             "from": 3,

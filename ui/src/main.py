@@ -170,6 +170,13 @@ class MainWindow(QMainWindow):
         btn_color = QPushButton("Graf Renklendir (Welsh–Powell)")
         btn_color.clicked.connect(self.run_coloring)
 
+        btn_update_node = QPushButton("Node Güncelle")
+        btn_update_node.clicked.connect(self.open_update_node)
+
+        btn_delete_node = QPushButton("Node Sil")
+        btn_delete_node.clicked.connect(self.open_delete_node)
+
+
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
         left_layout.addWidget(btn_add_edge)
@@ -181,6 +188,9 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(btn_dijkstra)
         left_layout.addWidget(btn_astar)
         left_layout.addWidget(btn_color)
+        left_layout.addWidget(btn_update_node)
+        left_layout.addWidget(btn_delete_node)
+
 
 
 
@@ -218,7 +228,18 @@ class MainWindow(QMainWindow):
 
     def open_astar(self):
        dialog = AStarDialog(self.graph)
-       dialog.exec_()            
+       dialog.exec_() 
+
+    def open_update_node(self):
+       dialog = UpdateNodeDialog(self.graph)
+       if dialog.exec_():
+        self.draw_graph()
+
+    def open_delete_node(self):
+       dialog = DeleteNodeDialog(self.graph)
+       if dialog.exec_():
+        self.draw_graph()
+                  
 
 
     def run_bfs(self):
@@ -472,6 +493,101 @@ class NodeItem(QGraphicsEllipseItem):
             f"Bağlantı Sayısı: {self.node.baglanti_sayisi}"
         )
         super().mousePressEvent(event)
+
+class UpdateNodeDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Node Güncelle")
+        self.setFixedSize(350, 260)
+
+        layout = QVBoxLayout()
+
+        self.id_input = QLineEdit()
+        self.name_input = QLineEdit()
+        self.aktiflik_input = QLineEdit()
+        self.etkilesim_input = QLineEdit()
+
+        layout.addWidget(QLabel("Güncellenecek Node ID"))
+        layout.addWidget(self.id_input)
+
+        layout.addWidget(QLabel("Yeni İsim (boş bırakabilirsin)"))
+        layout.addWidget(self.name_input)
+
+        layout.addWidget(QLabel("Yeni Aktiflik (0-1) (boş bırakabilirsin)"))
+        layout.addWidget(self.aktiflik_input)
+
+        layout.addWidget(QLabel("Yeni Etkileşim (boş bırakabilirsin)"))
+        layout.addWidget(self.etkilesim_input)
+
+        btn_update = QPushButton("Güncelle")
+        btn_update.clicked.connect(self.update_node)
+        layout.addWidget(btn_update)
+
+        self.setLayout(layout)
+
+    def update_node(self):
+        try:
+            node_id = int(self.id_input.text().strip())
+
+            name = self.name_input.text().strip()
+            name = name if name else None
+
+            aktiflik_txt = self.aktiflik_input.text().strip()
+            aktiflik = float(aktiflik_txt) if aktiflik_txt else None
+            if aktiflik is not None and not (0 <= aktiflik <= 1):
+                raise ValueError("Aktiflik 0 ile 1 arasında olmalı")
+
+            etkilesim_txt = self.etkilesim_input.text().strip()
+            etkilesim = int(etkilesim_txt) if etkilesim_txt else None
+
+            self.graph.update_node(node_id, name=name, aktiflik=aktiflik, etkilesim=etkilesim)
+            QMessageBox.information(self, "Başarılı", "Node güncellendi.")
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))  
+
+class DeleteNodeDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Node Sil")
+        self.setFixedSize(300, 140)
+
+        layout = QVBoxLayout()
+
+        self.id_input = QLineEdit()
+        layout.addWidget(QLabel("Silinecek Node ID"))
+        layout.addWidget(self.id_input)
+
+        btn_del = QPushButton("Sil")
+        btn_del.clicked.connect(self.delete_node)
+        layout.addWidget(btn_del)
+
+        self.setLayout(layout)
+
+    def delete_node(self):
+        try:
+            node_id = int(self.id_input.text().strip())
+
+            # emin olmak için ufak onay
+            reply = QMessageBox.question(
+                self,
+                "Onay",
+                f"Node {node_id} silinsin mi?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            self.graph.remove_node(node_id)
+            QMessageBox.information(self, "Başarılı", "Node silindi.")
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+
 
 
 

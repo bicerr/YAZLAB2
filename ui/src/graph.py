@@ -88,6 +88,29 @@ class Graph:
         self.nodes.append(node)
         self._autosave()
 
+    def update_node(self, node_id, name=None, aktiflik=None, etkilesim=None):
+        node = self.get_node_by_id(node_id)
+        if node is None:
+            raise ValueError("Node bulunamadı")
+
+        if name is not None:
+            node.name = name
+        if aktiflik is not None:
+            node.aktiflik = float(aktiflik)
+        if etkilesim is not None:
+            node.etkilesim = int(etkilesim)
+
+ 
+        node.baglanti_sayisi = len(node.komsular)
+
+        for e in self.edges:
+            if e.source == node_id or e.target == node_id:
+                n1 = self.get_node_by_id(e.source)
+                n2 = self.get_node_by_id(e.target)
+                e.weight = self.calculate_weight(n1, n2)
+
+        self._autosave()    
+
     def remove_node(self, node_id):
         node = self.get_node_by_id(node_id)
         if node is None:
