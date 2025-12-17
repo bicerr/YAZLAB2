@@ -1,13 +1,4 @@
 import sys
-import os
-
-
-# Proje kök dizinini path'e ekle
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
-
-from ui.src.graph import Graph
-from ui.src.node import Node
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
@@ -15,9 +6,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QMessageBox, QDialog
 )
 
-from ui.src.graph import Graph
-from ui.src.node import Node
-
+from .graph import Graph
+from .node import Node
 
 
 # =========================
@@ -135,7 +125,7 @@ class MainWindow(QMainWindow):
         dialog.exec_()
 
     def save_json(self):
-        self.graph.save_to_json("data/graph.json")
+        self.graph.save_to_json(self.graph.data_path)
         QMessageBox.information(self, "Kaydedildi", "Graph JSON dosyasına kaydedildi.")
 
 

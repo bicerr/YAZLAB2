@@ -1,28 +1,26 @@
 import json
+import os
 
 from .node import Node
 from .edge import Edge
 
 
 class Graph:
-    def __init__(self, data_path="data/graph.json", autosave=True):
+    def __init__(self, data_path=None, autosave=True):
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        self.data_path = data_path or os.path.join(base_dir, "data", "graph.json")
+        self.autosave = autosave
         self.nodes = []
         self.edges = []
-        self.data_path = data_path
-        self.autosave = autosave
 
-    # =========================
-    # INTERNAL AUTOSAVE
-    # =========================
-    def _autosave(self):
-        if self.autosave and self.data_path:
-            self.save_to_json(self.data_path)
+        if os.path.exists(self.data_path):
+            self.load_from_json(self.data_path)
 
     # =========================
     # JSON İŞLEMLERİ
     # =========================
     def load_from_json(self, path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         self.nodes = [
@@ -34,11 +32,12 @@ class Graph:
                 n["baglanti_sayisi"],
                 n["komsular"]
             )
-            for n in data["nodes"]
+            for n in data.get("nodes", [])
         ]
 
         self.edges = [
-            Edge(e["from"], e["to"], e["weight"]) for e in data["edges"]
+            Edge(e["from"], e["to"], e["weight"])
+            for e in data.get("edges", [])
         ]
 
     def save_to_json(self, path):
@@ -64,8 +63,15 @@ class Graph:
             ]
         }
 
-        with open(path, "w") as f:
-            json.dump(data, f, indent=4)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    # =========================
+    # INTERNAL AUTOSAVE
+    # =========================
+    def _autosave(self):
+        if self.autosave and self.data_path:
+            self.save_to_json(self.data_path)
 
     # =========================
     # NODE İŞLEMLERİ

@@ -1,10 +1,18 @@
 {
     "nodes": [
         {
-            "id": 5,
-            "name": "abd\u00fcl",
+            "id": 4,
+            "name": "bekir",
             "aktiflik": 0.5,
-            "etkilesim": 10,
+            "etkilesim": 11,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 8,
+            "name": "abdul",
+            "aktiflik": 0.5,
+            "etkilesim": 8,
             "baglanti_sayisi": 0,
             "komsular": []
         }
