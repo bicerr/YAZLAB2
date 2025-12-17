@@ -333,10 +333,22 @@ class MainWindow(QMainWindow):
 
         # Edge’ler
         pen = QPen(Qt.black, 2)
+
         for e in self.graph.edges:
             p1 = positions[e.source]
             p2 = positions[e.target]
-            self.scene.addItem(QGraphicsLineItem(p1.x(), p1.y(), p2.x(), p2.y()))
+
+            line = QGraphicsLineItem(p1.x(), p1.y(), p2.x(), p2.y())
+            line.setPen(pen)
+
+
+            line.setAcceptedMouseButtons(Qt.NoButton)
+
+   
+            line.setZValue(-1)
+
+            self.scene.addItem(line)
+
 
         # Node’lar
         for node in self.graph.nodes:
