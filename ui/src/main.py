@@ -114,6 +114,52 @@ class AddEdgeDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
 
+class DeleteEdgeDialog(QDialog):
+    def __init__(self, graph: Graph):
+        super().__init__()
+        self.graph = graph
+        self.setWindowTitle("Edge Sil")
+        self.setFixedSize(300, 160)
+
+        layout = QVBoxLayout()
+
+        self.node1_input = QLineEdit()
+        self.node2_input = QLineEdit()
+
+        layout.addWidget(QLabel("Node 1 ID"))
+        layout.addWidget(self.node1_input)
+
+        layout.addWidget(QLabel("Node 2 ID"))
+        layout.addWidget(self.node2_input)
+
+        btn_del = QPushButton("Sil")
+        btn_del.clicked.connect(self.delete_edge)
+        layout.addWidget(btn_del)
+
+        self.setLayout(layout)
+
+    def delete_edge(self):
+        try:
+            n1 = int(self.node1_input.text().strip())
+            n2 = int(self.node2_input.text().strip())
+
+            reply = QMessageBox.question(
+                self,
+                "Onay",
+                f"Edge ({n1} - {n2}) silinsin mi?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            self.graph.remove_edge(n1, n2)
+            QMessageBox.information(self, "Başarılı", "Edge silindi.")
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+
+
 
 # =========================
 # ANA PENCERE
@@ -176,6 +222,10 @@ class MainWindow(QMainWindow):
         btn_delete_node = QPushButton("Node Sil")
         btn_delete_node.clicked.connect(self.open_delete_node)
 
+        btn_delete_edge = QPushButton("Edge Sil")
+        btn_delete_edge.clicked.connect(self.open_delete_edge)
+
+
 
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
@@ -190,6 +240,8 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(btn_color)
         left_layout.addWidget(btn_update_node)
         left_layout.addWidget(btn_delete_node)
+        left_layout.addWidget(btn_delete_edge)
+
 
 
 
@@ -205,6 +257,12 @@ class MainWindow(QMainWindow):
         central.setLayout(main_layout)
 
         self.draw_graph()
+
+    def open_delete_edge(self):
+            dialog = DeleteEdgeDialog(self.graph)
+            if dialog.exec_():
+                self.draw_graph()
+
 
     # =========================
     # ACTIONS

@@ -176,6 +176,38 @@ class Graph:
         node2.baglanti_sayisi = len(node2.komsular)
 
         self._autosave()
+        
+    def remove_edge(self, source_id, target_id):
+            removed = False
+            new_edges = []
+
+            for e in self.edges:
+                if (e.source == source_id and e.target == target_id) or (e.source == target_id and e.target == source_id):
+                    removed = True
+            else:
+                new_edges.append(e)
+
+            if not removed:
+                raise ValueError("Edge bulunamadı")
+
+            self.edges = new_edges
+
+    # Komşulukları güncelle
+            n1 = self.get_node_by_id(source_id)
+            n2 = self.get_node_by_id(target_id)
+
+            if n1 and target_id in n1.komsular:
+                    n1.komsular.remove(target_id)
+                    n1.baglanti_sayisi = len(n1.komsular)
+
+            if n2 and source_id in n2.komsular:
+                n2.komsular.remove(source_id)
+            n2.baglanti_sayisi = len(n2.komsular)
+
+            self._autosave()
+
+
+        
 
     # =========================
     # BFS (Breadth First Search)
