@@ -1,28 +1,28 @@
 import json
+import os
+from collections import deque
 
 from .node import Node
 from .edge import Edge
 
 
 class Graph:
-    def __init__(self, data_path="data/graph.json", autosave=True):
-        self.nodes = []
-        self.edges = []
-        self.data_path = data_path
+    def __init__(self, data_path=None, autosave=True):
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        self.data_path = data_path or os.path.join(base_dir, "data", "graph.json")
         self.autosave = autosave
 
-    # =========================
-    # INTERNAL AUTOSAVE
-    # =========================
-    def _autosave(self):
-        if self.autosave and self.data_path:
-            self.save_to_json(self.data_path)
+        self.nodes = []
+        self.edges = []
+
+        if os.path.exists(self.data_path):
+            self.load_from_json(self.data_path)
 
     # =========================
     # JSON İŞLEMLERİ
     # =========================
     def load_from_json(self, path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         self.nodes = [
@@ -34,11 +34,12 @@ class Graph:
                 n["baglanti_sayisi"],
                 n["komsular"]
             )
-            for n in data["nodes"]
+            for n in data.get("nodes", [])
         ]
 
         self.edges = [
-            Edge(e["from"], e["to"], e["weight"]) for e in data["edges"]
+            Edge(e["from"], e["to"], e["weight"])
+            for e in data.get("edges", [])
         ]
 
     def save_to_json(self, path):
@@ -64,8 +65,12 @@ class Graph:
             ]
         }
 
-        with open(path, "w") as f:
-            json.dump(data, f, indent=4)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    def _autosave(self):
+        if self.autosave and self.data_path:
+            self.save_to_json(self.data_path)
 
     # =========================
     # NODE İŞLEMLERİ
@@ -82,6 +87,29 @@ class Graph:
 
         self.nodes.append(node)
         self._autosave()
+
+    def update_node(self, node_id, name=None, aktiflik=None, etkilesim=None):
+        node = self.get_node_by_id(node_id)
+        if node is None:
+            raise ValueError("Node bulunamadı")
+
+        if name is not None:
+            node.name = name
+        if aktiflik is not None:
+            node.aktiflik = float(aktiflik)
+        if etkilesim is not None:
+            node.etkilesim = int(etkilesim)
+
+ 
+        node.baglanti_sayisi = len(node.komsular)
+
+        for e in self.edges:
+            if e.source == node_id or e.target == node_id:
+                n1 = self.get_node_by_id(e.source)
+                n2 = self.get_node_by_id(e.target)
+                e.weight = self.calculate_weight(n1, n2)
+
+        self._autosave()    
 
     def remove_node(self, node_id):
         node = self.get_node_by_id(node_id)
@@ -136,13 +164,264 @@ class Graph:
             raise ValueError("Bu edge zaten var")
 
         weight = self.calculate_weight(node1, node2)
-
         self.edges.append(Edge(source_id, target_id, weight))
 
-        node1.komsular.append(target_id)
-        node2.komsular.append(source_id)
+        # komşuluk tekrarını engelle
+        if target_id not in node1.komsular:
+            node1.komsular.append(target_id)
+        if source_id not in node2.komsular:
+            node2.komsular.append(source_id)
 
-        node1.baglanti_sayisi += 1
-        node2.baglanti_sayisi += 1
+        node1.baglanti_sayisi = len(node1.komsular)
+        node2.baglanti_sayisi = len(node2.komsular)
 
         self._autosave()
+
+    # =========================
+    # BFS (Breadth First Search)
+    # =========================
+    def bfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        queue = deque()
+        result = []
+
+        queue.append(start_node_id)
+        visited.add(start_node_id)
+
+        while queue:
+            current_id = queue.popleft()
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    visited.add(komsu_id)
+                    queue.append(komsu_id)
+
+        print("BFS sonucu:", result)
+        return result
+
+    # =========================
+    # DFS (Depth First Search)
+    # =========================
+    def dfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        result = []
+
+        def _dfs(current_id):
+            visited.add(current_id)
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    _dfs(komsu_id)
+
+        _dfs(start_node_id)
+
+        print("DFS sonucu:", result)
+        return result
+    
+        # =========================
+    # Connected Components
+    # =========================
+    def connected_components(self):
+        visited = set()
+        components = []
+
+    # Tüm node’ları dolaş (izole node dahil)
+        for node in self.nodes:
+            if node.id in visited:
+                continue
+
+        # Yeni bileşen başlat
+            comp = []
+            stack = [node.id]
+            visited.add(node.id)
+
+            while stack:
+                current_id = stack.pop()
+                comp.append(current_id)
+
+                current_node = self.get_node_by_id(current_id)
+                if current_node is None:
+                    continue
+
+                for nb in current_node.komsular:
+                    if nb not in visited:
+                        visited.add(nb)
+                        stack.append(nb)
+
+            components.append(comp)
+
+        return components
+
+
+                # =========================
+    # Degree Centrality (Top 5)
+    # =========================
+    def degree_centrality_top5(self):
+        # (node_id, degree) listesi
+        degrees = [(n.id, len(n.komsular)) for n in self.nodes]
+
+        # degree büyükten küçüğe sırala
+        degrees.sort(key=lambda x: x[1], reverse=True)
+
+        # ilk 5
+        return degrees[:5]
+
+    # =========================
+    # Dijkstra En Kısa Yol
+    # =========================
+    def dijkstra(self, start_id, end_id):
+        if self.get_node_by_id(start_id) is None or self.get_node_by_id(end_id) is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        # Mesafeler
+        distances = {node.id: float("inf") for node in self.nodes}
+        previous = {node.id: None for node in self.nodes}
+
+        distances[start_id] = 0
+        unvisited = set(distances.keys())
+
+        while unvisited:
+            current = min(unvisited, key=lambda node_id: distances[node_id])
+            unvisited.remove(current)
+
+            if current == end_id:
+                break
+
+            current_node = self.get_node_by_id(current)
+            for neighbor_id in current_node.komsular:
+                if neighbor_id not in unvisited:
+                    continue
+
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                weight = self.calculate_weight(current_node, neighbor_node)
+                new_dist = distances[current] + weight
+
+                if new_dist < distances[neighbor_id]:
+                    distances[neighbor_id] = new_dist
+                    previous[neighbor_id] = current
+
+        # Yol oluşturma
+        path = []
+        current = end_id
+        while current is not None:
+            path.insert(0, current)
+            current = previous[current]
+
+        if path[0] != start_id:
+            raise ValueError("Bu iki node arasında yol yok")
+
+        return path, distances[end_id]
+    
+        # =========================
+    # A* (A-Star) En Kısa Yol
+    # =========================
+    def heuristic(self, node1: Node, node2: Node):
+        # Basit ve tutarlı heuristic:
+        # Özellik farklarına dayalı tahmin (küçük fark = yakın)
+        return (
+            abs(node1.aktiflik - node2.aktiflik)
+            + abs(node1.etkilesim - node2.etkilesim)
+            + abs(node1.baglanti_sayisi - node2.baglanti_sayisi)
+        )
+
+    def astar(self, start_id, end_id):
+        start_node = self.get_node_by_id(start_id)
+        end_node = self.get_node_by_id(end_id)
+
+        if start_node is None or end_node is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        open_set = {start_id}
+        came_from = {}
+
+        g_score = {node.id: float("inf") for node in self.nodes}
+        f_score = {node.id: float("inf") for node in self.nodes}
+
+        g_score[start_id] = 0
+        f_score[start_id] = self.heuristic(start_node, end_node)
+
+        while open_set:
+            current = min(open_set, key=lambda nid: f_score[nid])
+
+            if current == end_id:
+                # Yol oluştur
+                path = [current]
+                while current in came_from:
+                    current = came_from[current]
+                    path.insert(0, current)
+                return path, g_score[end_id]
+
+            open_set.remove(current)
+            current_node = self.get_node_by_id(current)
+
+            for neighbor_id in current_node.komsular:
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                tentative_g = g_score[current] + self.calculate_weight(
+                    current_node, neighbor_node
+                )
+
+                if tentative_g < g_score[neighbor_id]:
+                    came_from[neighbor_id] = current
+                    g_score[neighbor_id] = tentative_g
+                    f_score[neighbor_id] = tentative_g + self.heuristic(
+                        neighbor_node, end_node
+                    )
+                    open_set.add(neighbor_id)
+
+        raise ValueError("Bu iki node arasında yol yok")
+    
+    # =========================
+    # Welsh–Powell Graph Coloring
+    # =========================
+    def welsh_powell(self):
+        # Node'ları dereceye göre büyükten küçüğe sırala
+        sorted_nodes = sorted(
+            self.nodes,
+            key=lambda n: n.baglanti_sayisi,
+            reverse=True
+        )
+
+        color_of = {}   # node_id -> color_index
+        current_color = 0
+
+        for node in sorted_nodes:
+            if node.id in color_of:
+                continue
+
+            color_of[node.id] = current_color
+
+            for other in sorted_nodes:
+                if other.id in color_of:
+                    continue
+
+                # Komşuların rengiyle çakışıyor mu?
+                conflict = False
+                for komsu in other.komsular:
+                    if color_of.get(komsu) == current_color:
+                        conflict = True
+                        break
+
+                if not conflict:
+                    color_of[other.id] = current_color
+
+            current_color += 1
+
+        return color_of
+
+
+
+
+        return components
+
