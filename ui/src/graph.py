@@ -19,6 +19,52 @@ class Graph:
             self.load_from_json(self.data_path)
 
     # =========================
+    # CSV İŞLEMLERİ (YENİ)
+    # =========================
+    def load_from_csv(self, path):
+        import csv
+        import random
+        self.nodes = []
+        self.edges = []
+        
+        # Helper to get or create node
+        def get_or_create(nid):
+            n = self.get_node_by_id(nid)
+            if not n:
+                # Randomize attributes
+                act = round(random.uniform(0.1, 1.0), 2)
+                inter = random.randint(1, 100)
+                n = Node(nid, f"Node {nid}", act, inter) 
+                self.nodes.append(n)
+            return n
+
+        with open(path, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) < 2: continue
+                # Expected: Source, Target, [Weight]
+                try:
+                    s_id = int(row[0])
+                    t_id = int(row[1])
+                    w = float(row[2]) if len(row) > 2 else 1.0
+                    
+                    n1 = get_or_create(s_id)
+                    n2 = get_or_create(t_id)
+                    
+                    if not self.edge_exists(s_id, t_id):
+                        self.edges.append(Edge(s_id, t_id, w))
+                        
+                        # Update neighbors
+                        if t_id not in n1.komsular: n1.komsular.append(t_id)
+                        if s_id not in n2.komsular: n2.komsular.append(s_id)
+                        n1.baglanti_sayisi = len(n1.komsular)
+                        n2.baglanti_sayisi = len(n2.komsular)
+                except ValueError:
+                    continue # Skip header or invalid rows
+
+        self._autosave()
+
+    # =========================
     # JSON İŞLEMLERİ
     # =========================
     def load_from_json(self, path):
@@ -454,8 +500,94 @@ class Graph:
 
         return color_of
 
+    # =========================
+    # Spring Layout (Fruchterman-Reingold)
+    # =========================
+    def spring_layout(self, width=1200, height=800, iterations=50):
+        """
+        Basit bir yay-kütle (Spring-Force) yerleşim algoritması.
+        """
+        import random
+        import math
+        
+        nodes = self.nodes
+        n = len(nodes)
+        if n == 0: return {}
+        if n == 1: return {nodes[0].id: (width/2, height/2)}
 
+        # 1. Başlangıç pozisyonları (Rastgele)
+        positions = {node.id: [random.uniform(100, width-100), random.uniform(100, height-100)] for node in nodes}
+        
+        # Sabitler
+        area = width * height
+        k = math.sqrt(area / n)
+        
+        t = width / 10 # Başlangıç sıcaklığı
+        dt = t / (iterations + 1)
 
+        for i in range(iterations):
+            disp = {node.id: [0.0, 0.0] for node in nodes}
 
-        return components
+            # 2. İtme Kuvvetleri (Repulsive) - Herkes herkesi iter
+            for v_node in nodes:
+                v = v_node.id
+                v_pos = positions[v]
+                for u_node in nodes:
+                    u = u_node.id
+                    if u == v: continue
+                    
+                    u_pos = positions[u]
+                    
+                    delta_x = v_pos[0] - u_pos[0]
+                    delta_y = v_pos[1] - u_pos[1]
+                    dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
+                    
+                    # Fr = k^2 / d
+                    force = (k * k) / dist
+                    disp[v][0] += (delta_x / dist) * force
+                    disp[v][1] += (delta_y / dist) * force
 
+            # 3. Çekme Kuvvetleri (Attractive) - Sadece bağlı olanlar
+            for edge in self.edges:
+                v = edge.source
+                u = edge.target
+                if v not in positions or u not in positions: continue
+                
+                v_pos = positions[v]
+                u_pos = positions[u]
+                
+                delta_x = v_pos[0] - u_pos[0]
+                delta_y = v_pos[1] - u_pos[1]
+                dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
+                
+                # Fa = d^2 / k
+                force = (dist * dist) / k
+                
+                # v -> u çekilir
+                disp[v][0] -= (delta_x / dist) * force
+                disp[v][1] -= (delta_y / dist) * force
+                
+                # u -> v çekilir
+                disp[u][0] += (delta_x / dist) * force
+                disp[u][1] += (delta_y / dist) * force
+
+            # 4. Pozisyon Güncelleme
+            for node in nodes:
+                v = node.id
+                d_len = math.sqrt(disp[v][0]**2 + disp[v][1]**2) or 0.01
+                
+                # Sıcaklık ile sınırla
+                step = min(d_len, t)
+                
+                positions[v][0] += (disp[v][0] / d_len) * step
+                positions[v][1] += (disp[v][1] / d_len) * step
+                
+                # Sınırlar içinde tut
+                positions[v][0] = min(width-50, max(50, positions[v][0]))
+                positions[v][1] = min(height-50, max(50, positions[v][1]))
+
+            # Soğutma
+            t -= dt
+
+        # Tuple olarak döndür
+        return {nid: (pos[0], pos[1]) for nid, pos in positions.items()}

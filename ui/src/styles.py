@@ -82,6 +82,9 @@ PANEL_STYLE = f"""
         padding-bottom: 5px;
         border-bottom: 1px solid {COLORS["glass_border"]};
     }}
+    QFrame#Panel QLabel {{
+        margin-top: 2px;
+    }}
 """
 
 HEADER_STYLE = f"""
@@ -123,10 +126,17 @@ INPUT_STYLE = f"""
         border: 1px solid {COLORS["border"]};
         border-radius: 4px;
         color: {COLORS["text"]};
-        padding: 5px;
+        padding: 4px 6px;
+        min-height: 20px;
+        font-size: 12px;
+        margin-bottom: 2px;
     }}
     QLineEdit:focus, QComboBox:focus {{
         border: 1px solid {COLORS["accent_cyan"]};
+    }}
+    QComboBox::drop-down {{
+        border: none;
+        width: 15px;
     }}
 """
 
