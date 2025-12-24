@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem,
 from PyQt5.QtGui import QBrush, QPen
 from PyQt5.QtCore import Qt, QPointF
 from PyQt5.QtGui import QBrush, QPen, QPainter, QColor
+from PyQt5.QtWidgets import QSizePolicy
+
 
 import math
 
@@ -173,18 +175,30 @@ class MainWindow(QMainWindow):
         self.scene = QGraphicsScene()
         self.scene.setBackgroundBrush(QBrush(QColor(245, 245, 245)))
         self.view = QGraphicsView(self.scene)
+        self.view.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+        self.view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        self.view.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+
+
         self.view.setRenderHint(QPainter.Antialiasing, True)
         self.view.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
 
         self.setWindowTitle("Sosyal Ağ Analizi Uygulaması")
-        self.setFixedSize(1000, 600)
+        self.resize(1400, 850)
 
         central = QWidget()
         self.setCentralWidget(central)
 
         main_layout = QHBoxLayout()
         left_layout = QVBoxLayout()
+        left_widget = QWidget()
+        left_widget.setLayout(left_layout)
+        left_widget.setFixedWidth(280)
+
         right_layout = QVBoxLayout()
 
         btn_add_node = QPushButton("Node Ekle")
@@ -229,32 +243,47 @@ class MainWindow(QMainWindow):
 
 
 
-        left_layout.addWidget(QLabel("Kontrol Paneli"))
-        left_layout.addWidget(btn_add_node)
-        left_layout.addWidget(btn_add_edge)
-        left_layout.addWidget(btn_bfs)
-        left_layout.addWidget(btn_dfs)
-        left_layout.addWidget(btn_save)
-        left_layout.addWidget(btn_cc)
-        left_layout.addWidget(btn_top5)
-        left_layout.addWidget(btn_dijkstra)
-        left_layout.addWidget(btn_astar)
-        left_layout.addWidget(btn_color)
-        left_layout.addWidget(btn_update_node)
-        left_layout.addWidget(btn_delete_node)
-        left_layout.addWidget(btn_delete_edge)
-
+        
 
 
 
 
         left_layout.addStretch()
 
+        left_layout.addWidget(self.create_section_label("📌 Grafik İşlemleri"))
+        left_layout.addWidget(btn_add_node)
+        left_layout.addWidget(btn_update_node)
+        left_layout.addWidget(btn_delete_node)
+        left_layout.addWidget(btn_add_edge)
+        left_layout.addWidget(btn_delete_edge)
+
+        left_layout.addWidget(self.create_section_label("📊 Algoritmalar"))
+        left_layout.addWidget(btn_bfs)
+        left_layout.addWidget(btn_dfs)
+        left_layout.addWidget(btn_dijkstra)
+        left_layout.addWidget(btn_astar)
+        left_layout.addWidget(btn_cc)
+
+        left_layout.addWidget(self.create_section_label("📈 Analiz"))
+        left_layout.addWidget(btn_top5)
+        left_layout.addWidget(btn_color)
+
+        left_layout.addWidget(self.create_section_label("💾 Veri"))
+        left_layout.addWidget(btn_save)
+
+        left_layout.addStretch()
+
+
+
+
         right_layout.addWidget(QLabel("Graf Çizim Alanı (Canvas)"))
         right_layout.addWidget(self.view) 
 
-        main_layout.addLayout(left_layout, 1)
-        main_layout.addLayout(right_layout, 3)
+        main_layout.addWidget(left_widget)
+        main_layout.addLayout(right_layout)
+
+        main_layout.addLayout(right_layout, 5)
+
 
         central.setLayout(main_layout)
 
@@ -283,6 +312,18 @@ class MainWindow(QMainWindow):
 
 
         self.draw_graph()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fit_scene()
+
+    def fit_scene(self):
+        if not self.scene.items():
+            return
+
+        rect = self.scene.itemsBoundingRect()
+        self.scene.setSceneRect(rect)
+        self.view.fitInView(rect, Qt.KeepAspectRatio)
 
     def open_delete_edge(self):
         dialog = DeleteEdgeDialog(self.graph)
@@ -484,6 +525,9 @@ class MainWindow(QMainWindow):
             item = NodeItem(node, pos.x(), pos.y(), color=color)
             self.scene.addItem(item)
 
+            self.fit_scene()
+
+
     def draw_grid(self, step=40):
         pen = QPen(QColor(220, 220, 220))
         rect = self.scene.sceneRect()
@@ -497,6 +541,26 @@ class MainWindow(QMainWindow):
         while y < rect.bottom():
             self.scene.addLine(rect.left(), y, rect.right(), y, pen)
             y += step
+
+    def create_section_label(self, text):
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setMinimumHeight(32)
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        label.setStyleSheet("""
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                color: #2c3e50;
+                padding: 6px;
+                background-color: #ecf0f1;
+                border-radius: 4px;
+            }
+        """)
+        return label
+
+
 
 
 

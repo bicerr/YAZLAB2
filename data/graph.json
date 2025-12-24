@@ -5,16 +5,20 @@
             "name": "ee",
             "aktiflik": 0.7,
             "etkilesim": 12,
-            "baglanti_sayisi": 0,
-            "komsular": []
+            "baglanti_sayisi": 1,
+            "komsular": [
+                2
+            ]
         },
         {
             "id": 2,
             "name": "ww",
             "aktiflik": 0.4,
             "etkilesim": 5,
-            "baglanti_sayisi": 0,
-            "komsular": []
+            "baglanti_sayisi": 1,
+            "komsular": [
+                1
+            ]
         },
         {
             "id": 3,
@@ -39,7 +43,21 @@
             "etkilesim": 15,
             "baglanti_sayisi": 0,
             "komsular": []
+        },
+        {
+            "id": 6,
+            "name": "kk",
+            "aktiflik": 0.8,
+            "etkilesim": 3,
+            "baglanti_sayisi": 0,
+            "komsular": []
         }
     ],
-    "edges": []
+    "edges": [
+        {
+            "from": 1,
+            "to": 2,
+            "weight": 0.019964064683569573
+        }
+    ]
 }
