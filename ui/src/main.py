@@ -4,7 +4,7 @@ import os
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsLineItem
 from PyQt5.QtGui import QBrush, QPen
 from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import QBrush, QPen, QPainter
+from PyQt5.QtGui import QBrush, QPen, QPainter, QColor
 
 import math
 
@@ -171,6 +171,7 @@ class MainWindow(QMainWindow):
         self.graph = Graph()
         from PyQt5.QtGui import QPainter
         self.scene = QGraphicsScene()
+        self.scene.setBackgroundBrush(QBrush(QColor(245, 245, 245)))
         self.view = QGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing, True)
         self.view.setRenderHint(QPainter.SmoothPixmapTransform, True)
@@ -256,6 +257,30 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_layout, 3)
 
         central.setLayout(main_layout)
+
+        self.setStyleSheet("""
+        QWidget {
+            font-family: 'Segoe UI';
+            font-size: 13px;
+        }
+
+        QPushButton {
+            background-color: #2E3440;
+            color: white;
+            border-radius: 6px;
+            padding: 6px;
+        }
+
+        QPushButton:hover {
+            background-color: #4C566A;
+        }
+
+        QLabel {
+            font-weight: bold;
+            margin-top: 8px;
+        }
+    """)
+
 
         self.draw_graph()
 
@@ -384,6 +409,10 @@ class MainWindow(QMainWindow):
 
     def draw_graph(self):
         self.scene.clear()
+        self.scene.clear()
+        self.scene.setSceneRect(0, 0, 700, 500)
+        self.draw_grid()
+
 
         if not self.graph.nodes:
             return
@@ -434,8 +463,6 @@ class MainWindow(QMainWindow):
             positions[node.id] = QPointF(x, y)
 
     # === EDGE'LER ===
-        pen = QPen(Qt.black, 2)
-
         for e in self.graph.edges:
             if e.source not in positions or e.target not in positions:
                 continue
@@ -443,10 +470,10 @@ class MainWindow(QMainWindow):
             p1 = positions[e.source]
             p2 = positions[e.target]
 
-            line = QGraphicsLineItem(p1.x(), p1.y(), p2.x(), p2.y())
-            line.setPen(pen)
-            line.setZValue(-1)
-            self.scene.addItem(line)
+            edge_item = EdgeItem(e, p1, p2)
+            self.scene.addItem(edge_item)
+            self.scene.addItem(edge_item.label)
+
 
     # === NODE'LAR ===
         for node in self.graph.nodes:
@@ -456,6 +483,20 @@ class MainWindow(QMainWindow):
 
             item = NodeItem(node, pos.x(), pos.y(), color=color)
             self.scene.addItem(item)
+
+    def draw_grid(self, step=40):
+        pen = QPen(QColor(220, 220, 220))
+        rect = self.scene.sceneRect()
+
+        x = int(rect.left())
+        while x < rect.right():
+            self.scene.addLine(x, rect.top(), x, rect.bottom(), pen)
+            x += step
+
+        y = int(rect.top())
+        while y < rect.bottom():
+            self.scene.addLine(rect.left(), y, rect.right(), y, pen)
+            y += step
 
 
 
@@ -546,6 +587,10 @@ class AStarDialog(QDialog):
             QMessageBox.critical(self, "Hata", str(e))
 
 
+from PyQt5.QtWidgets import QGraphicsTextItem, QMessageBox
+from PyQt5.QtGui import QBrush, QPen
+from PyQt5.QtCore import Qt
+
 
 class NodeItem(QGraphicsEllipseItem):
     def __init__(self, node, x, y, r=18, color=Qt.gray):
@@ -555,6 +600,19 @@ class NodeItem(QGraphicsEllipseItem):
         self.setBrush(QBrush(color))
         self.setPen(QPen(Qt.black, 2))
         self.setFlag(QGraphicsEllipseItem.ItemIsSelectable, True)
+
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(
+            f"ID: {node.id}\n"
+            f"İsim: {node.name}\n"
+            f"Aktiflik: {node.aktiflik}\n"
+            f"Etkileşim: {node.etkilesim}\n"
+            f"Bağlantı Sayısı: {node.baglanti_sayisi}"
+        )   
+
+        label = QGraphicsTextItem(str(node.id), self)
+        label.setDefaultTextColor(Qt.white)
+        label.setPos(r / 2, r / 2)
 
     def mousePressEvent(self, event):
         scene = self.scene()
@@ -571,6 +629,73 @@ class NodeItem(QGraphicsEllipseItem):
             f"Etkileşim: {self.node.etkilesim}\n"
             f"Bağlantı Sayısı: {self.node.baglanti_sayisi}"
         )
+
+        super().mousePressEvent(event)
+
+
+    
+    def hoverEnterEvent(self, event):
+        self.setPen(QPen(Qt.yellow, 3))
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        if not self.isSelected():
+            self.setPen(QPen(Qt.black, 2))
+        super().hoverLeaveEvent(event)
+
+class EdgeItem(QGraphicsLineItem):
+    def __init__(self, edge, p1: QPointF, p2: QPointF):
+        super().__init__(p1.x(), p1.y(), p2.x(), p2.y())
+
+        self.edge = edge
+        self.setZValue(-1)  # node'ların altında kalsın
+        self.setAcceptHoverEvents(True)
+        self.setFlag(QGraphicsLineItem.ItemIsSelectable, True)
+
+        thickness = 1 + edge.weight * 6
+        self.default_pen = QPen(Qt.black, thickness)
+        self.hover_pen = QPen(Qt.darkYellow, thickness + 1)
+        self.selected_pen = QPen(Qt.red, thickness + 2)
+
+        self.setPen(self.default_pen)
+        self.setToolTip(
+            f"Edge\n"
+            f"{edge.source} ↔ {edge.target}\n"
+            f"Ağırlık: {edge.weight:.4f}"
+        )
+
+
+        # Ağırlık etiketi
+        mid_x = (p1.x() + p2.x()) / 2
+        mid_y = (p1.y() + p2.y()) / 2
+
+        self.label = QGraphicsTextItem(f"{edge.weight:.2f}")
+        self.label.setDefaultTextColor(Qt.darkGray)
+        self.label.setPos(mid_x, mid_y)
+
+    def hoverEnterEvent(self, event):
+        self.setPen(self.hover_pen)
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        if not self.isSelected():
+            self.setPen(self.default_pen)
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        scene = self.scene()
+        if scene:
+            scene.clearSelection()
+        self.setSelected(True)
+        self.setPen(self.selected_pen)
+
+        QMessageBox.information(
+            None,
+            "Edge Bilgisi",
+            f"{self.edge.source} ↔ {self.edge.target}\n"
+            f"Ağırlık: {self.edge.weight:.4f}"
+        )
+
         super().mousePressEvent(event)
 
 class UpdateNodeDialog(QDialog):
