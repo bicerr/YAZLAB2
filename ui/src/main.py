@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Sosialex - Sosyal Ağ Analizi")
         self.resize(1450, 900)
-        self.setStyleSheet(MAIN_APP_STYLE)
+        # self.setStyleSheet(MAIN_APP_STYLE)  <-- Moved to main for global scope
         
         self.graph = Graph()
         
@@ -184,19 +184,19 @@ class MainWindow(QMainWindow):
         # 1. Graf İşlemleri
         p1 = Panel("Graf İşlemleri")
         
-        b1 = GlossyButton("+ Kullanıcı Ekle")
+        b1 = GlossyButton("+ Node Ekle")
         b1.clicked.connect(self.open_add_node)
         p1.add_widget(b1)
         
-        b2 = GlossyButton("- Kullanıcı Sil")
+        b2 = GlossyButton("- Node Sil")
         b2.clicked.connect(self.open_delete_node)
         p1.add_widget(b2)
         
-        b3 = GlossyButton("+ Bağlantı Ekle")
+        b3 = GlossyButton("+ Edge Ekle")
         b3.clicked.connect(self.open_add_edge)
         p1.add_widget(b3)
         
-        b4 = GlossyButton("- Bağlantı Sil")
+        b4 = GlossyButton("- Edge Sil")
         b4.clicked.connect(self.open_delete_edge)
         p1.add_widget(b4)
         
@@ -447,6 +447,13 @@ class MainWindow(QMainWindow):
             
             self.graph.update_node(nid, name=name, aktiflik=act, etkilesim=inter)
             self.draw_graph()
+            
+            # Re-select to keep focus
+            for item in self.scene.items():
+                if isinstance(item, NodeItem) and item.node.id == nid:
+                    item.setSelected(True)
+                    break
+
             QMessageBox.information(self, "Başarılı", "Güncellendi")
         except Exception as e:
             QMessageBox.warning(self, "Hata", str(e))
@@ -457,7 +464,9 @@ class MainWindow(QMainWindow):
     # To Ensure functionality, I'll add minimal dialogs inline here (same as before).
     
     def run_algo_dialog(self, type):
-        QMessageBox.information(self, "Bilgi", "Algoritma çalıştırıldı (Simulasyon)")
+        if TraverseDialog(self.graph).exec_():
+            pass # changes happen in dialog
+            
         
     def show_top5(self):
         res = self.graph.degree_centrality_top5()
@@ -530,7 +539,7 @@ class DeleteEdgeDialog(BaseDialog):
 class DijkstraDialog(BaseDialog):
     def __init__(self, g):
         super().__init__(); self.g=g; self.setWindowTitle("Dijkstra"); l=QVBoxLayout(self)
-        self.i1=QLineEdit(); self.i2=QLineEdit(); l.addWidget(self.i1); l.addWidget(self.i2)
+        self.i1=QLineEdit(); self.i2=QLineEdit(); l.addWidget(QLabel("Başlangıç ID")); l.addWidget(self.i1); l.addWidget(QLabel("Bitiş ID")); l.addWidget(self.i2)
         b=QPushButton("Hesapla"); b.clicked.connect(self.act); l.addWidget(b)
     def act(self):
         try:
@@ -538,8 +547,62 @@ class DijkstraDialog(BaseDialog):
              QMessageBox.information(self,"Sonuç",f"Yol: {p}\nMaliyet: {c}")
         except Exception as e: QMessageBox.warning(self,"Hata",str(e))
 
+class TraverseDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__()
+        self.g = g
+        self.setWindowTitle("BFS / DFS")
+        self.layout_main = QVBoxLayout(self)
+        
+        self.layout_main.addWidget(QLabel("Başlangıç Node ID:"))
+        self.inp_start = QLineEdit()
+        self.inp_start.setPlaceholderText("ID giriniz (örn: 1)")
+        self.inp_start.setStyleSheet(INPUT_STYLE)
+        self.layout_main.addWidget(self.inp_start)
+        
+        self.layout_main.addWidget(QLabel("Algoritma:"))
+        self.cb_algo = QComboBox()
+        self.cb_algo.addItems(["BFS", "DFS"])
+        self.cb_algo.setStyleSheet(INPUT_STYLE)
+        self.layout_main.addWidget(self.cb_algo)
+        
+        btn = QPushButton("Çalıştır")
+        btn.setStyleSheet(BUTTON_STYLE)
+        btn.clicked.connect(self.run_algo)
+        self.layout_main.addWidget(btn)
+        
+    def run_algo(self):
+        try:
+            sid = int(self.inp_start.text())
+            algo = self.cb_algo.currentText()
+            
+            if algo == "BFS":
+                res = self.g.bfs(sid)
+            else:
+                res = self.g.dfs(sid)
+                
+            QMessageBox.information(self, "Sonuç", f"{algo} Ziyaret Sırası:\n{res}")
+            
+            # Visualization on the graph (Simple Highlighting)
+            # Accessing MainWindow instance is tricky from here without passing it.
+            # But the requirement is "Make it work". The easiest visual feedback is changing node colors.
+            # We can change node colors in the graph or simply return data.
+            # Better approach: We can access the scene if we passed it, or we rely on the user seeing the message box.
+            # Let's try to highlight by modifying the node items directly if possible?
+            # Actually, `draw_graph` re-renders everything. 
+            # We can simulate highlighting by temporarily storing 'highlighted_path' in graph or widget?
+            # For now, let's just show the result. The user asked "make it work".
+            # To add "visuals", let's update draw_graph to maybe show numbers? 
+            # Or just rely on the message box for now as step 1.
+            
+            self.accept()
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyleSheet(MAIN_APP_STYLE) # Apply style globally to fix dialogs/modals
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())

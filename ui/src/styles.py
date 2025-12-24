@@ -33,7 +33,7 @@ MAIN_APP_STYLE = f"""
     QScrollBar:vertical {{
         background: {COLORS["background"]};
         width: 8px;
-        margin: 0px; 20px; 0 20px;
+        margin: 0px 20px 0 20px;
     }}
     QScrollBar::handle:vertical {{
         background: {COLORS["border"]};
@@ -46,6 +46,26 @@ MAIN_APP_STYLE = f"""
     }}
     QMessageBox {{
         background-color: {COLORS["panel"]};
+        border: 1px solid {COLORS["glass_border"]};
+    }}
+    QMessageBox QLabel {{
+        color: {COLORS["text"]};
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 13px;
+        background-color: transparent;
+    }}
+    QMessageBox QPushButton {{
+        background-color: {COLORS["input_bg"]};
+        color: {COLORS["text"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        padding: 6px 20px;
+        min-width: 80px;
+    }}
+    QMessageBox QPushButton:hover {{
+        background-color: {COLORS["border"]};
+        border: 1px solid {COLORS["accent_blue"]};
+        color: white;
     }}
 """
 

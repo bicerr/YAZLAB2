@@ -15,7 +15,7 @@
             "id": 2,
             "name": "djjkd",
             "aktiflik": 0.6,
-            "etkilesim": 12,
+            "etkilesim": 7,
             "baglanti_sayisi": 2,
             "komsular": [
                 1,
@@ -26,7 +26,7 @@
             "id": 3,
             "name": "jdjd",
             "aktiflik": 0.9,
-            "etkilesim": 45,
+            "etkilesim": 40,
             "baglanti_sayisi": 2,
             "komsular": [
                 2,
@@ -37,7 +37,7 @@
             "id": 4,
             "name": "djjd",
             "aktiflik": 1.0,
-            "etkilesim": 25,
+            "etkilesim": 45,
             "baglanti_sayisi": 2,
             "komsular": [
                 3,
@@ -49,7 +49,7 @@
         {
             "from": 1,
             "to": 2,
-            "weight": 0.03840245775729647
+            "weight": 0.9615384615384615
         },
         {
             "from": 2,
@@ -59,12 +59,12 @@
         {
             "from": 3,
             "to": 4,
-            "weight": 0.002487500310937539
+            "weight": 0.03844675124951941
         },
         {
             "from": 1,
             "to": 4,
-            "weight": 0.0030735185640521265
+            "weight": 0.0006918691537056512
         }
     ]
 }
