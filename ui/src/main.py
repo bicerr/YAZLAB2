@@ -227,6 +227,7 @@ class MainWindow(QMainWindow):
 
 
 
+
         left_layout.addWidget(QLabel("Kontrol Paneli"))
         left_layout.addWidget(btn_add_node)
         left_layout.addWidget(btn_add_edge)
@@ -259,9 +260,9 @@ class MainWindow(QMainWindow):
         self.draw_graph()
 
     def open_delete_edge(self):
-            dialog = DeleteEdgeDialog(self.graph)
-            if dialog.exec_():
-                self.draw_graph()
+        dialog = DeleteEdgeDialog(self.graph)
+        if dialog.exec_():
+            self.draw_graph()
 
 
     # =========================
@@ -387,7 +388,7 @@ class MainWindow(QMainWindow):
         if not self.graph.nodes:
             return
 
-        # Welsh–Powell renkleri
+    # Welsh–Powell renkleri
         try:
             colors = self.graph.welsh_powell()
         except:
@@ -396,46 +397,66 @@ class MainWindow(QMainWindow):
         palette = [
             Qt.red, Qt.blue, Qt.green, Qt.yellow,
             Qt.magenta, Qt.cyan, Qt.darkRed, Qt.darkBlue
-        ]
+    ]
 
-        # Daire düzeni
-        cx, cy = 350, 250
-        radius = 180
+    # === MERKEZ VE PARAMETRELER ===
+        center_x, center_y = 350, 250
+        MAX_RADIUS = 220
+
+        K_ETKILESIM = 12      # etkileşim → merkeze çekme
+        K_BAGLANTI = 18       # bağlantı sayısı → merkeze çekme
+        K_AKTIFLIK = 140      # aktiflik → yukarı taşıma
+
         n = len(self.graph.nodes)
+        angle_step = 2 * math.pi / max(1, n)
+
         positions = {}
 
+    # === NODE POZİSYONLARI (SEÇENEK 2) ===
         for i, node in enumerate(self.graph.nodes):
-            angle = 2 * math.pi * i / n
-            x = cx + radius * math.cos(angle)
-            y = cy + radius * math.sin(angle)
+            radius = (
+                MAX_RADIUS
+                - node.etkilesim * K_ETKILESIM
+                - node.baglanti_sayisi * K_BAGLANTI
+        )
+
+            radius = max(60, radius)  # merkeze yapışmasın
+
+            angle = i * angle_step
+
+            x = center_x + radius * math.cos(angle)
+            y = (
+                center_y
+                + radius * math.sin(angle)
+                - node.aktiflik * K_AKTIFLIK
+        )
+
             positions[node.id] = QPointF(x, y)
 
-        # Edge’ler
+    # === EDGE'LER ===
         pen = QPen(Qt.black, 2)
 
         for e in self.graph.edges:
+            if e.source not in positions or e.target not in positions:
+                continue
+
             p1 = positions[e.source]
             p2 = positions[e.target]
 
             line = QGraphicsLineItem(p1.x(), p1.y(), p2.x(), p2.y())
             line.setPen(pen)
-
-
-            line.setAcceptedMouseButtons(Qt.NoButton)
-
-   
             line.setZValue(-1)
-
             self.scene.addItem(line)
 
-
-        # Node’lar
+    # === NODE'LAR ===
         for node in self.graph.nodes:
             color_idx = colors.get(node.id, 0)
             color = palette[color_idx % len(palette)]
             pos = positions[node.id]
+
             item = NodeItem(node, pos.x(), pos.y(), color=color)
             self.scene.addItem(item)
+
 
 
 

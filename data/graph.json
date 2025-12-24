@@ -2,67 +2,44 @@
     "nodes": [
         {
             "id": 1,
-            "name": "bekir",
-            "aktiflik": 0.5,
-            "etkilesim": 10,
-            "baglanti_sayisi": 3,
-            "komsular": [
-                3,
-                4
-            ]
+            "name": "ee",
+            "aktiflik": 0.7,
+            "etkilesim": 12,
+            "baglanti_sayisi": 0,
+            "komsular": []
+        },
+        {
+            "id": 2,
+            "name": "ww",
+            "aktiflik": 0.4,
+            "etkilesim": 5,
+            "baglanti_sayisi": 0,
+            "komsular": []
         },
         {
             "id": 3,
-            "name": "C",
-            "aktiflik": 0.6,
-            "etkilesim": 9,
-            "baglanti_sayisi": 2,
-            "komsular": [
-                1,
-                4
-            ]
+            "name": "eeer",
+            "aktiflik": 0.2,
+            "etkilesim": 2,
+            "baglanti_sayisi": 0,
+            "komsular": []
         },
         {
             "id": 4,
-            "name": "D",
-            "aktiflik": 0.6,
-            "etkilesim": 6,
-            "baglanti_sayisi": 3,
-            "komsular": [
-                1,
-                3
-            ]
+            "name": "ewr",
+            "aktiflik": 0.9,
+            "etkilesim": 20,
+            "baglanti_sayisi": 0,
+            "komsular": []
         },
         {
             "id": 5,
-            "name": "E",
-            "aktiflik": 0.9,
+            "name": "ekkle",
+            "aktiflik": 1.0,
             "etkilesim": 15,
-            "baglanti_sayisi": 0,
-            "komsular": []
-        },
-        {
-            "id": 6,
-            "name": "aaa",
-            "aktiflik": 0.5,
-            "etkilesim": 11,
-            "baglanti_sayisi": 0,
-            "komsular": []
-        },
-        {
-            "id": 7,
-            "name": "bb",
-            "aktiflik": 0.6,
-            "etkilesim": 8,
             "baglanti_sayisi": 0,
             "komsular": []
         }
     ],
-    "edges": [
-        {
-            "from": 6,
-            "to": 7,
-            "weight": 0.0999000999000999
-        }
-    ]
+    "edges": []
 }
