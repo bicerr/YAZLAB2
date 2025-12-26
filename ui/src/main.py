@@ -111,6 +111,27 @@ class EdgeItem(QGraphicsLineItem):
         pen = QPen(QColor(COLORS["text_muted"]), w)
         pen.setCapStyle(Qt.RoundCap)
         self.setPen(pen)
+        
+        # Tooltip
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(f"Edge: {edge.source}-{edge.target}\nAğırlık: {edge.weight:.4f}")
+
+        # Text Label (Visual)
+        mid_x = (p1.x() + p2.x()) / 2
+        mid_y = (p1.y() + p2.y()) / 2
+        
+        self.text = QGraphicsTextItem(f"{edge.weight:.2f}", self)
+        # Center the text
+        rect = self.text.boundingRect()
+        self.text.setPos(mid_x - rect.width()/2, mid_y - rect.height()/2)
+        
+        # Style
+        self.text.setDefaultTextColor(QColor("#a5b4fc")) # Light Indigo
+        font = QFont("Arial", 9)
+        self.text.setFont(font)
+        
+        # Background for text
+        # (Optional: could add a rect behind, but let's try simple text first to avoid clutter)
 
 # =========================
 # MAIN WINDOW
@@ -162,11 +183,13 @@ class MainWindow(QMainWindow):
         hl = QHBoxLayout(header)
         hl.setContentsMargins(20, 0, 20, 0)
         
-        # Simple Logo/Icon + Text
+        # Centered Logo/Text
+        hl.addStretch() # Push title to center
         title = QLabel("◇ Sosialex  ||  Sosyal Ağ Analizi Uygulaması")
         title.setObjectName("AppTitle")
+        title.setAlignment(Qt.AlignCenter)
         hl.addWidget(title)
-        hl.addStretch()
+        hl.addStretch() # Push icons to right
         
         # Dummy system icons
         sys_icons = QLabel("🎥 🎤 ⚙️ ★")
@@ -208,6 +231,10 @@ class MainWindow(QMainWindow):
         b_save = GlossyButton("💾 Kaydet (JSON)")
         b_save.clicked.connect(self.save_graph)
         p2.add_widget(b_save)
+
+        b_revert = GlossyButton("<< Geri Al (Son Kayıt)")
+        b_revert.clicked.connect(self.revert_graph)
+        p2.add_widget(b_revert)
         
         b_load = GlossyButton("📂 Yükle (CSV)")
         b_load.clicked.connect(self.load_csv_dialog)
@@ -612,6 +639,19 @@ class MainWindow(QMainWindow):
     def save_graph(self):
         self.graph.save_to_json(self.graph.data_path)
         QMessageBox.information(self, "Kayıt", "Kaydedildi.")
+
+    def revert_graph(self):
+        try:
+            if not os.path.exists(self.graph.data_path):
+                QMessageBox.warning(self, "Hata", "Kayıtlı dosya bulunamadı.")
+                return
+            
+            self.graph.load_from_json(self.graph.data_path)
+            self.is_colored = False
+            self.draw_graph()
+            QMessageBox.information(self, "Başarılı", "Son kaydedilen duruma geri dönüldü.")
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
 
     def load_csv_dialog(self):
         path, _ = QFileDialog.getOpenFileName(self, "CSV Yükle", "", "CSV Files (*.csv)")
