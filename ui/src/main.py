@@ -7,7 +7,8 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QDialog, 
     QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsLineItem,
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
-    QSizePolicy, QGraphicsTextItem, QScrollArea, QGraphicsItem, QComboBox, QFileDialog
+    QSizePolicy, QGraphicsTextItem, QScrollArea, QGraphicsItem, QComboBox, QFileDialog,
+    QStackedWidget
 )
 from PyQt5.QtGui import QBrush, QPen, QPainter, QColor, QFont, QRadialGradient
 from PyQt5.QtCore import Qt, QPointF, pyqtSignal
@@ -22,6 +23,7 @@ from ui.src.styles import (
     COLORS, MAIN_APP_STYLE, HEADER_STYLE, PANEL_STYLE, 
     BUTTON_STYLE, INPUT_STYLE, TABLE_STYLE
 )
+from ui.src.dashboard import DashboardWidget
 
 # =========================
 # UTILS & WIDGETS
@@ -147,9 +149,15 @@ class MainWindow(QMainWindow):
         self.is_colored = False  # Track if coloring should be applied
         
         # Main Layout
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
+        # Main Layout
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
+        
+        # PAGE 0: Graph Editor (Existing)
+        self.page_editor = QWidget()
+        self.stack.addWidget(self.page_editor)
+        
+        main_layout = QVBoxLayout(self.page_editor)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
@@ -170,6 +178,14 @@ class MainWindow(QMainWindow):
         
         # RIGHT COL
         self.create_right_col(body_layout)
+        
+        # PAGE 1: Dashboard (Placeholder, init on demand or now)
+        # We will init on demand to refresh data, or refresh on show.
+        # Let's create a container for it.
+        self.page_dashboard_container = QWidget()
+        self.stack.addWidget(self.page_dashboard_container)
+        dash_layout = QVBoxLayout(self.page_dashboard_container)
+        dash_layout.setContentsMargins(0,0,0,0)
         
         # Initial Draw
         self.draw_graph()
@@ -264,6 +280,13 @@ class MainWindow(QMainWindow):
         b_algo4 = GlossyButton("Merkezilik Analizi")
         b_algo4.clicked.connect(self.show_top5)
         p3.add_widget(b_algo4)
+        
+        b_algo4.clicked.connect(self.show_top5)
+        p3.add_widget(b_algo4)
+        
+        b_dash = GlossyButton("📊 Detaylı Analiz Panosu")
+        b_dash.clicked.connect(self.open_dashboard)
+        p3.add_widget(b_dash)
         
         l.addWidget(p3)
         
@@ -639,6 +662,27 @@ class MainWindow(QMainWindow):
     def save_graph(self):
         self.graph.save_to_json(self.graph.data_path)
         QMessageBox.information(self, "Kayıt", "Kaydedildi.")
+
+    def open_dashboard(self):
+        try:
+            # Re-create dashboard to ensure fresh data
+            # Remove old dashboard if exists
+            if self.page_dashboard_container.layout().count() > 0:
+                item = self.page_dashboard_container.layout().takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            
+            self.dashboard = DashboardWidget(self.graph)
+            self.dashboard.back_clicked.connect(self.close_dashboard)
+            self.page_dashboard_container.layout().addWidget(self.dashboard)
+            
+            self.stack.setCurrentIndex(1)
+            
+        except Exception as e:
+             QMessageBox.warning(self, "Hata", str(e))
+
+    def close_dashboard(self):
+        self.stack.setCurrentIndex(0)
 
     def revert_graph(self):
         try:
