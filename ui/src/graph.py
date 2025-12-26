@@ -114,6 +114,32 @@ class Graph:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
+    def export_adjacency_matrix(self, path):
+        # Nodes sorted by ID for consistency
+        sorted_nodes = sorted(self.nodes, key=lambda n: n.id)
+        node_ids = [n.id for n in sorted_nodes]
+        n_count = len(node_ids)
+        
+        # Build matrix
+        # Row header: Node IDs
+        matrix = []
+        header = [""] + [str(nid) for nid in node_ids]
+        matrix.append(header)
+        
+        for i, r_node in enumerate(sorted_nodes):
+            row = [str(r_node.id)]
+            for c_node in sorted_nodes:
+                val = "0"
+                if self.edge_exists(r_node.id, c_node.id):
+                   val = "1"
+                row.append(val)
+            matrix.append(row)
+            
+        import csv
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(matrix)
+
     def _autosave(self):
         if self.autosave and self.data_path:
             self.save_to_json(self.data_path)
@@ -385,8 +411,14 @@ class Graph:
                     continue
 
                 neighbor_node = self.get_node_by_id(neighbor_id)
-                weight = self.calculate_weight(current_node, neighbor_node)
-                new_dist = distances[current] + weight
+                # İsterlerde "Ağırlık = Maliyet" dense de, formül benzer düğümlere YÜKSEK ağırlık veriyor.
+                # Dijkstra EN AZ maliyetli (en kısa) yolu arar.
+                # Benzer düğümleri tercih etmek için Maliyet = 1 / Ağırlık (veya benzeri) olmalı.
+                # Burada 1/weight kullanıyoruz ki Yüksek Ağırlık -> Düşük Maliyet olsun.
+                weight_val = self.calculate_weight(current_node, neighbor_node)
+                cost = 1.0 / weight_val if weight_val > 0 else float('inf')
+                
+                new_dist = distances[current] + cost
 
                 if new_dist < distances[neighbor_id]:
                     distances[neighbor_id] = new_dist
@@ -408,8 +440,10 @@ class Graph:
     # A* (A-Star) En Kısa Yol
     # =========================
     def heuristic(self, node1: Node, node2: Node):
-        # Basit ve tutarlı heuristic:
-        # Özellik farklarına dayalı tahmin (küçük fark = yakın)
+        # Maliyet olarak (1/Weight) ~ (1 + Farklar^2) kullanıyoruz.
+        # Heuristic, maliyet ile uyumlu olmalı (Underestimation for admissibility).
+        # (1 + Diff^2) >= Diff.
+        # Basitçe farkların toplamını kullanmak (Manhattan benzeri) makul bir yaklaşımdır.
         return (
             abs(node1.aktiflik - node2.aktiflik)
             + abs(node1.etkilesim - node2.etkilesim)
@@ -448,9 +482,11 @@ class Graph:
 
             for neighbor_id in current_node.komsular:
                 neighbor_node = self.get_node_by_id(neighbor_id)
-                tentative_g = g_score[current] + self.calculate_weight(
-                    current_node, neighbor_node
-                )
+                
+                weight_val = self.calculate_weight(current_node, neighbor_node)
+                cost = 1.0 / weight_val if weight_val > 0 else float('inf')
+                
+                tentative_g = g_score[current] + cost
 
                 if tentative_g < g_score[neighbor_id]:
                     came_from[neighbor_id] = current

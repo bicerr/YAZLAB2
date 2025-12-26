@@ -212,6 +212,10 @@ class MainWindow(QMainWindow):
         b_load = GlossyButton("📂 Yükle (CSV)")
         b_load.clicked.connect(self.load_csv_dialog)
         p2.add_widget(b_load)
+
+        b_export_mat = GlossyButton("📤 Matris Çıktısı (CSV)")
+        b_export_mat.clicked.connect(self.export_matrix_dialog)
+        p2.add_widget(b_export_mat)
         
         l.addWidget(p2)
         
@@ -376,8 +380,10 @@ class MainWindow(QMainWindow):
         
         # 3. Performans
         p_perf = Panel("Performans")
-        p_perf.add_widget(QLabel("Çalışma Süresi: 0.05 ms"))
-        p_perf.add_widget(QLabel("Bellek Kullanımı: 42 MB"))
+        self.lbl_perf_time = QLabel("Çalışma Süresi: -")
+        p_perf.add_widget(self.lbl_perf_time)
+        # self.lbl_perf_mem = QLabel("Bellek Kullanımı: -") 
+        # p_perf.add_widget(self.lbl_perf_mem) # Memory is harder to track precisely in Python in realtime without overhead
         l.addWidget(p_perf)
         
         l.addStretch()
@@ -541,6 +547,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Hata", str(e))
 
     def display_algorithm_results(self, algo_type, start_id, target_id=None):
+        import time
+        t_start = time.perf_counter()
+        
         try:
             result_msg = ""
             results_for_table = [] # List of (Key, Value) tuples
@@ -586,6 +595,11 @@ class MainWindow(QMainWindow):
                 self.res_table.setItem(i, 0, QTableWidgetItem(str(key)))
                 self.res_table.setItem(i, 1, QTableWidgetItem(str(val)))
 
+            # Timing end
+            t_end = time.perf_counter()
+            duration_ms = (t_end - t_start) * 1000.0
+            self.lbl_perf_time.setText(f"Çalışma Süresi: {duration_ms:.4f} ms")
+
             # Optional: Show popup? User asked for table, maybe popup is annoying if repeated.
             # Keeping popup for now as it's explicit feedback.
             QMessageBox.information(self, "Sonuç", result_msg)
@@ -607,6 +621,15 @@ class MainWindow(QMainWindow):
                 self.is_colored = False # Reset coloring on new load
                 self.draw_graph()
                 QMessageBox.information(self, "Başarılı", "Graf CSV'den yüklendi.")
+            except Exception as e:
+                QMessageBox.warning(self, "Hata", str(e))
+
+    def export_matrix_dialog(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Matris Kaydet", "adjacency_matrix.csv", "CSV Files (*.csv)")
+        if path:
+            try:
+                self.graph.export_adjacency_matrix(path)
+                QMessageBox.information(self, "Başarılı", "Komşuluk matrisi kaydedildi.")
             except Exception as e:
                 QMessageBox.warning(self, "Hata", str(e))
 
@@ -641,18 +664,42 @@ class MainWindow(QMainWindow):
             # Chromatic number is max color index + 1 (since 0-indexed)
             chromatic_number = max(colors.values()) + 1
             
+            # Palette used in draw_graph for reference
+            palette_names = ["Kırmızı", "Sarı", "Yeşil", "Mavi", "Koyu Lacivert"]
+
             # Update Table
-            self.res_table.setRowCount(2)
+            # Rows: Algo Name, Chromatic Num, Header, [Node...Color]
+            total_rows = 2 + 1 + len(colors) 
+            self.res_table.setRowCount(total_rows)
+            
+            # Summary
             self.res_table.setItem(0, 0, QTableWidgetItem("Algoritma"))
             self.res_table.setItem(0, 1, QTableWidgetItem("Welsh-Powell"))
             
             self.res_table.setItem(1, 0, QTableWidgetItem("Kromatik Sayı"))
             self.res_table.setItem(1, 1, QTableWidgetItem(str(chromatic_number)))
             
+            # Separator / Header
+            header_item = QTableWidgetItem("--- Detaylar ---")
+            header_item.setBackground(QColor(COLORS['panel']))
+            header_item.setForeground(QColor(COLORS['accent_cyan']))
+            self.res_table.setItem(2, 0, header_item)
+            self.res_table.setItem(2, 1, QTableWidgetItem(""))
+
+            # Node Details
+            # Sort by color then ID for nicer list
+            sorted_items = sorted(colors.items(), key=lambda x: (x[1], x[0]))
+            
+            for i, (nid, c_idx) in enumerate(sorted_items):
+                row = 3 + i
+                color_name = palette_names[c_idx % len(palette_names)]
+                self.res_table.setItem(row, 0, QTableWidgetItem(f"Node {nid}"))
+                self.res_table.setItem(row, 1, QTableWidgetItem(f"{color_name} (Kod: {c_idx})"))
+            
             # Re-draw to ensure colors are applied
             self.draw_graph()
             
-            QMessageBox.information(self, "Başarılı", f"Graf renklendirildi.\nKromatik Sayı (En az gerekli renk): {chromatic_number}")
+            QMessageBox.information(self, "Başarılı", f"Graf renklendirildi.\nKromatik Sayı: {chromatic_number}\nDetaylar tabloda listelendi.")
             
         except Exception as e:
             QMessageBox.warning(self, "Hata", str(e))
