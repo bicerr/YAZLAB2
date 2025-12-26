@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QLabel, QFrame, QTableWidget, QTableWidgetItem, QHeaderView, QGridLayout,
     QPushButton
 )
-from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPen
+from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPen, QLinearGradient
 from PyQt5.QtCore import Qt, QSize
 
 from ui.src.styles import COLORS, PANEL_STYLE, TABLE_STYLE
@@ -78,13 +78,19 @@ class SimpleBarChart(QWidget):
             # Bar Height
             bar_h = (val / max_val) * (h - 40)
             
-            # Setup Brush
-            painter.setBrush(QBrush(self.bar_color))
+            # Setup Gradient Brush
+            real_h = int(bar_h) if int(bar_h) > 0 else 1
+            rect_x = int(current_x)
+            rect_y = int(h - 20 - bar_h)
+            
+            gradient = QLinearGradient(0, rect_y, 0, rect_y + real_h)
+            gradient.setColorAt(0, self.bar_color.lighter(130)) # Lighter top
+            gradient.setColorAt(1, self.bar_color.darker(110))  # Darker bottom
+            
+            painter.setBrush(QBrush(gradient))
             painter.setPen(Qt.NoPen)
             
             # Draw Bar
-            rect_x = current_x
-            rect_y = h - 20 - bar_h
             
             # Round rect
             painter.drawRoundedRect(int(rect_x), int(rect_y), int(bar_width), int(bar_h), 4, 4)

@@ -916,6 +916,34 @@ class ZoomableGraphicsView(QGraphicsView):
         self._panning = False
         self._pan_start = QPointF(0, 0)
 
+    def drawBackground(self, painter, rect):
+        super().drawBackground(painter, rect)
+        
+        # Grid settings
+        grid_size = 40
+        grid_color = QColor(255, 255, 255, 30) # More visible white (Alpha 10 -> 30)
+        
+        painter.setPen(QPen(grid_color, 1))
+        
+        # Calculate start/end based on visible rect or scene rect
+        # Using scene rect usually, but rect arg is the exposed rect
+        l = int(rect.left())
+        r = int(rect.right())
+        t = int(rect.top())
+        b = int(rect.bottom())
+        
+        # Snap to grid
+        start_x = l - (l % grid_size)
+        start_y = t - (t % grid_size)
+        
+        # Vertical lines
+        for x in range(start_x, r, grid_size):
+            painter.drawLine(x, t, x, b)
+            
+        # Horizontal lines
+        for y in range(start_y, b, grid_size):
+            painter.drawLine(l, y, r, y)
+
     def mousePressEvent(self, event):
         # Allow Right Click OR Middle Click for panning
         if event.button() == Qt.RightButton or event.button() == Qt.MiddleButton:
