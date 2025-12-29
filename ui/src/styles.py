@@ -138,6 +138,13 @@ INPUT_STYLE = f"""
         border: none;
         width: 15px;
     }}
+    QComboBox QAbstractItemView {{
+        background-color: {COLORS["background"]};
+        color: {COLORS["text"]};
+        selection-background-color: {COLORS["accent_blue"]};
+        selection-color: white;
+        border: 1px solid {COLORS["border"]};
+    }}
 """
 
 TABLE_STYLE = f"""

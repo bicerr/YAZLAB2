@@ -720,6 +720,8 @@ class MainWindow(QMainWindow):
             
             self.graph.load_from_json(self.graph.data_path)
             self.is_colored = False
+            self.highlight_nodes.clear()
+            self.highlight_edges.clear()
             self.draw_graph()
             QMessageBox.information(self, "Başarılı", "Son kaydedilen duruma geri dönüldü.")
         except Exception as e:
@@ -731,6 +733,8 @@ class MainWindow(QMainWindow):
             try:
                 self.graph.load_from_csv(path)
                 self.is_colored = False # Reset coloring on new load
+                self.highlight_nodes.clear()
+                self.highlight_edges.clear()
                 self.draw_graph()
                 QMessageBox.information(self, "Başarılı", "Graf CSV'den yüklendi.")
             except Exception as e:
@@ -772,6 +776,10 @@ class MainWindow(QMainWindow):
 
             # Enable coloring mode
             self.is_colored = True
+            
+            # Clear Highlights
+            self.highlight_nodes.clear()
+            self.highlight_edges.clear()
 
             # Chromatic number is max color index + 1 (since 0-indexed)
             chromatic_number = max(colors.values()) + 1
