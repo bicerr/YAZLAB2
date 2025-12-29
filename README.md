@@ -85,13 +85,13 @@ Mevcut implementasyonda (dizi/liste kullanarak): **O(V^2)**.
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-    A[Basla] --> B[Mesafeleri sonsuz yap, kaynak=0]
+    A[Basla] --> B[Mesafeleri sonsuz yap ve kaynak dugumu 0 yap]
     B --> C{Ziyaret edilmemis dugum var mi}
     C -->|Hayir| D[Bitir]
-    C -->|Evet| E[En kucuk mesafeli dugumu sec: u]
-    E --> F[u'nun komsularini incele: v]
-    F --> G{Mesafe(u) + agirlik(u,v) < Mesafe(v)?}
-    G -->|Evet| H[Mesafe(v)'yi guncelle]
+    C -->|Evet| E[En kucuk mesafeli dugumu sec u]
+    E --> F[u dugumunun komsularini incele v]
+    F --> G{Yeni mesafe daha kucuk mu}
+    G -->|Evet| H[Mesafe v guncelle]
     G -->|Hayir| F
     H --> F
 ```
