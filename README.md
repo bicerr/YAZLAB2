@@ -1,3 +1,4 @@
+@ -0,0 +1,254 @@
 # YAZLAB2 - Sosyal Ağ Analizi ve Görselleştirme Aracı
 
 ## 1. Proje Bilgileri
@@ -36,15 +37,13 @@ Tüm düğümler (V) ve kenarlar (E) en fazla bir kez işlendiği için zaman ka
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-   A[Basla] --> B[Baslangic dugumunu yigina ekle]
-    B --> C{Yigin bos mu}
+    A[Basla] --> B[Baslangic dugumunu kuyruga ekle ve isaretle]
+    B --> C{Kuyruk bos mu}
     C -->|Evet| D[Bitir]
-    C -->|Hayir| E[Yigindan dugum cikar]
-    E --> F{Ziyaret edildi mi}
-    F -->|Evet| C
-    F -->|Hayir| G[Ziyaret et ve isaretle]
-    G --> H[Komsulari yigina ekle]
-    H --> C
+    C -->|Hayir| E[Kuyruktan dugum cikar]
+    E --> F[Ziyaret edilmemis komsulari bul]
+    F --> G[Komsulari kuyruga ekle ve isaretle]
+    G --> C
 ```
 
 **Literatür İncelemesi:**
@@ -86,14 +85,14 @@ Mevcut implementasyonda (dizi/liste kullanarak): **O(V^2)**.
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-    A([Başla]) --> B[Mesafeleri Sonsuz Yap, Kaynak=0]
-    B --> C{Ziyaret Edilmemiş Düğüm Var mı?}
-    C -- Hayır --> D([Bitir])
-    C -- Evet --> E[En Küçük Mesafeli Düğümü Seç (u)]
-    E --> F[u'nun Komşularını (v) İncele]
-    F --> G{Mesafe(u) + Ağırlık(u,v) < Mesafe(v)?}
-    G -- Evet --> H[Mesafe(v)'yi Güncelle]
-    G -- Hayır --> F
+    A[Basla] --> B[Mesafeleri sonsuz yap, kaynak=0]
+    B --> C{Ziyaret edilmemis dugum var mi}
+    C -->|Hayir| D[Bitir]
+    C -->|Evet| E[En kucuk mesafeli dugumu sec: u]
+    E --> F[u'nun komsularini incele: v]
+    F --> G{Mesafe(u) + agirlik(u,v) < Mesafe(v)?}
+    G -->|Evet| H[Mesafe(v)'yi guncelle]
+    G -->|Hayir| F
     H --> F
 ```
 
@@ -125,12 +124,12 @@ Sıralama işlemi **O(V log V)**. Boyama işlemi O(V + E). Toplam: **O(V log V +
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-    A([Başla]) --> B[Düğümleri Derecesine Göre Sırala (Azalan)]
+    A[Basla] --> B[Dugumleri dereceye gore sirala azalan]
     B --> C[Renk k = 1]
-    C --> D{Boyanmamış Düğüm Var mı?}
-    D -- Hayır --> E([Bitir])
-    D -- Evet --> F[Listeden Boyanmamış İlk Düğümü Al ve Rengi k Yap]
-    F --> G[Bu Düğümle Komşu Olmayan Diğer Boyanmamışları da k ile Boya]
+    C --> D{Boyanmamis dugum var mi}
+    D -->|Hayir| E[Bitir]
+    D -->|Evet| F[Ilk boyanmamis dugumu sec ve k ile boya]
+    F --> G[Komsu olmayan diger boyanmamis dugumleri de k ile boya]
     G --> H[k = k + 1]
     H --> D
 ```
