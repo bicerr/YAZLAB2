@@ -105,12 +105,13 @@ class NodeItem(QGraphicsEllipseItem):
         return super().itemChange(change, value)
 
 class EdgeItem(QGraphicsLineItem):
-    def __init__(self, edge, p1: QPointF, p2: QPointF):
+    def __init__(self, edge, p1: QPointF, p2: QPointF, color=None):
         super().__init__(p1.x(), p1.y(), p2.x(), p2.y())
         self.setZValue(-1)
         w = max(1, min(6, edge.weight * 3))
         
-        pen = QPen(QColor(COLORS["text_muted"]), w)
+        c = color if color else COLORS["text_muted"]
+        pen = QPen(QColor(c), w)
         pen.setCapStyle(Qt.RoundCap)
         self.setPen(pen)
         
@@ -141,12 +142,16 @@ class EdgeItem(QGraphicsLineItem):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Sosialex - Sosyal Ağ Analizi")
+        self.setWindowTitle("Sosyal Ağ Analiz Uygulaması")
         self.resize(1450, 900)
         # self.setStyleSheet(MAIN_APP_STYLE)  <-- Moved to main for global scope
         
         self.graph = Graph()
         self.is_colored = False  # Track if coloring should be applied
+        
+        # Highlighting State
+        self.highlight_nodes = set()
+        self.highlight_edges = set() # Set of tuples (u, v)
         
         # Main Layout
         # Main Layout
@@ -201,7 +206,7 @@ class MainWindow(QMainWindow):
         
         # Centered Logo/Text
         hl.addStretch() # Push title to center
-        title = QLabel("◇ Sosialex  ||  Sosyal Ağ Analizi Uygulaması")
+        title = QLabel("Sosyal Ağ Analiz Uygulaması")
         title.setObjectName("AppTitle")
         title.setAlignment(Qt.AlignCenter)
         hl.addWidget(title)
@@ -491,15 +496,23 @@ class MainWindow(QMainWindow):
         # Edges
         for e in self.graph.edges:
             if e.source in positions and e.target in positions:
-                self.scene.addItem(EdgeItem(e, positions[e.source], positions[e.target]))
+                # Check for highlight
+                ec = None
+                if (e.source, e.target) in self.highlight_edges or (e.target, e.source) in self.highlight_edges:
+                    ec = "#10b981" # Green
+                self.scene.addItem(EdgeItem(e, positions[e.source], positions[e.target], color=ec))
                 
         # Nodes
         for node in nodes:
             if node.id in positions:
+                c = default_color
                 if self.is_colored:
-                    c = palette[colors.get(node.id, 0) % len(palette)]
-                else:
-                    c = default_color
+                     c = palette[colors.get(node.id, 0) % len(palette)]
+                
+                # Overwrite if highlighted
+                if node.id in self.highlight_nodes:
+                    c = "#10b981" # Green
+                    
                 self.scene.addItem(NodeItem(node, positions[node.id].x(), positions[node.id].y(), color=c))
 
         # Auto fit to view
@@ -618,6 +631,13 @@ class MainWindow(QMainWindow):
                 
                 result_msg = f"{title} Sonuç:\nYol: {path}\nMaliyet: {cost:.2f}"
                 
+                # Highlight Path
+                self.highlight_nodes = set(path)
+                self.highlight_edges = set()
+                for i in range(len(path)-1):
+                    self.highlight_edges.add((path[i], path[i+1]))
+                self.draw_graph()
+
                 # Prepare Table Data
                 results_for_table.append(("Algoritma", title))
                 results_for_table.append(("Maliyet", f"{cost:.2f}"))
@@ -632,6 +652,14 @@ class MainWindow(QMainWindow):
                     res = self.graph.dfs(start_id)
                 
                 result_msg = f"{algo_type} Ziyaret Sırası:\n{res}"
+                
+                # Highlight Visited
+                self.highlight_nodes = set(res)
+                self.highlight_edges = set() 
+                # Optional: highlight edges in traversal order? 
+                # For BFS/DFS pure traversal, maybe just nodes is cleaner, or edges if known.
+                # Let's just highlight nodes for now to match 'Gidilen yol' conceptual for traversal.
+                self.draw_graph()
                 
                 # Prepare Table Data
                 results_for_table.append(("Algoritma", algo_type))
