@@ -60,15 +60,16 @@ Zaman karmaşıklığı **O(V + E)**'dir.
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-    A([Başla]) --> B[Başlangıç Düğümünü Yığına (Stack) Ekle]
-    B --> C{Yığın Boş mu?}
-    C -- Evet --> D([Bitir])
-    C -- Hayır --> E[Yığından Düğüm Çıkar]
-    E --> F{Ziyaret Edildi mi?}
-    F -- Evet --> C
-    F -- Hayır --> G[Ziyaret Et ve İşaretle]
-    G --> H[Komşuları Yığına Ekle]
+    A[Basla] --> B[Baslangic dugumunu yigina ekle]
+    B --> C{Yigin bos mu}
+    C -->|Evet| D[Bitir]
+    C -->|Hayir| E[Yigindan dugum cikar]
+    E --> F{Ziyaret edildi mi}
+    F -->|Evet| C
+    F -->|Hayir| G[Ziyaret et ve isaretle]
+    G --> H[Komsulari yigina ekle]
     H --> C
+
 ```
 
 ---
