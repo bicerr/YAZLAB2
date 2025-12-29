@@ -69,7 +69,6 @@ flowchart TD
     F -->|Hayir| G[Ziyaret et ve isaretle]
     G --> H[Komsulari yigina ekle]
     H --> C
-
 ```
 
 ---
