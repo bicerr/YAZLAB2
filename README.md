@@ -36,13 +36,15 @@ Tüm düğümler (V) ve kenarlar (E) en fazla bir kez işlendiği için zaman ka
 **Akış Diyagramı:**
 ```mermaid
 flowchart TD
-    A([Başla]) --> B[Başlangıç Düğümünü Kuyruğa Ekle ve İşaretle]
-    B --> C{Kuyruk Boş mu?}
-    C -- Evet --> D([Bitir])
-    C -- Hayır --> E[Kuyruktan Düğüm Çıkar (Current)]
-    E --> F[Ziyaret Edilmemiş Komşuları Bul]
-    F --> G[Komşuları Kuyruğa Ekle ve İşaretle]
-    G --> C
+   A[Basla] --> B[Baslangic dugumunu yigina ekle]
+    B --> C{Yigin bos mu}
+    C -->|Evet| D[Bitir]
+    C -->|Hayir| E[Yigindan dugum cikar]
+    E --> F{Ziyaret edildi mi}
+    F -->|Evet| C
+    F -->|Hayir| G[Ziyaret et ve isaretle]
+    G --> H[Komsulari yigina ekle]
+    H --> C
 ```
 
 **Literatür İncelemesi:**
