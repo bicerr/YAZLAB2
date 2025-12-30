@@ -759,7 +759,13 @@ class MainWindow(QMainWindow):
     def open_delete_edge(self):
         if DeleteEdgeDialog(self.graph).exec_(): self.draw_graph()
     def open_dijkstra(self):
-         DijkstraDialog(self.graph).exec_()
+         dlg = DijkstraDialog()
+         if dlg.exec_():
+             s, t = dlg.get_data()
+             if s is not None and t is not None:
+                 self.display_algorithm_results("Dijkstra", s, t)
+             else:
+                 QMessageBox.warning(self, "Hata", "Lütfen geçerli sayısal ID'ler giriniz.")
     def show_components(self):
         comps = self.graph.connected_components()
         self.res_table.setRowCount(len(comps))
@@ -880,25 +886,29 @@ class DeleteNodeDialog(BaseDialog):
 class AddEdgeDialog(BaseDialog):
     def __init__(self, g):
         super().__init__(); self.g=g; self.setWindowTitle("Edge Ekle"); l=QVBoxLayout(self)
-        self.i1=QLineEdit(); self.i2=QLineEdit(); l.addWidget(self.i1); l.addWidget(self.i2)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("1. ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("2. ID")); l.addWidget(self.i2)
         b=QPushButton("Ekle"); b.clicked.connect(lambda: (self.g.add_edge(int(self.i1.text()), int(self.i2.text())), self.accept())); l.addWidget(b)
 
 class DeleteEdgeDialog(BaseDialog):
     def __init__(self, g):
         super().__init__(); self.g=g; self.setWindowTitle("Edge Sil"); l=QVBoxLayout(self)
-        self.i1=QLineEdit(); self.i2=QLineEdit(); l.addWidget(self.i1); l.addWidget(self.i2)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("1. ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("2. ID")); l.addWidget(self.i2)
         b=QPushButton("Sil"); b.clicked.connect(lambda: (self.g.remove_edge(int(self.i1.text()), int(self.i2.text())), self.accept())); l.addWidget(b)
 
 class DijkstraDialog(BaseDialog):
-    def __init__(self, g):
-        super().__init__(); self.g=g; self.setWindowTitle("Dijkstra"); l=QVBoxLayout(self)
-        self.i1=QLineEdit(); self.i2=QLineEdit(); l.addWidget(QLabel("Başlangıç ID")); l.addWidget(self.i1); l.addWidget(QLabel("Bitiş ID")); l.addWidget(self.i2)
-        b=QPushButton("Hesapla"); b.clicked.connect(self.act); l.addWidget(b)
-    def act(self):
-        try:
-             p,c = self.g.dijkstra(int(self.i1.text()), int(self.i2.text()))
-             QMessageBox.information(self,"Sonuç",f"Yol: {p}\nMaliyet: {c}")
-        except Exception as e: QMessageBox.warning(self,"Hata",str(e))
+    def __init__(self):
+        super().__init__(); self.setWindowTitle("Dijkstra"); l=QVBoxLayout(self)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("Başlangıç ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("Bitiş ID")); l.addWidget(self.i2)
+        b=QPushButton("Hesapla"); b.clicked.connect(self.accept); l.addWidget(b)
+    def get_data(self):
+        try: return int(self.i1.text()), int(self.i2.text())
+        except: return None, None
 
 class TraverseDialog(BaseDialog):
     def __init__(self, g):
