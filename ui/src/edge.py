@@ -7,9 +7,7 @@ class Edge:
         self.target = target
         self.weight = weight
 
-    # -------------------------------
-    # JSON için yardımcı metodlar
-    # -------------------------------
+    
     def to_dict(self):
         return {
             "from": self.source,
@@ -25,9 +23,7 @@ class Edge:
             weight=data.get("weight", 1.0)
         )
 
-    # -------------------------------
-    # Yönsüzlük kontrolü
-    # -------------------------------
+    
     def matches(self, u, v):
         return (
             (self.source == u and self.target == v) or

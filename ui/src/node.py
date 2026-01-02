@@ -11,20 +11,16 @@ class Node:
         self.id = node_id
         self.name = name
 
-        # Node metrikleri
         self.aktiflik = aktiflik
         self.etkilesim = etkilesim
         self.baglanti_sayisi = baglanti_sayisi
 
-        # Komşu node id'leri
         if komsular is None:
             self.komsular = []
         else:
             self.komsular = list(komsular)
 
-    # -------------------------------
-    # Komşu işlemleri
-    # -------------------------------
+    
     def komsu_ekle(self, node_id):
         if node_id not in self.komsular:
             self.komsular.append(node_id)
@@ -35,9 +31,7 @@ class Node:
             self.komsular.remove(node_id)
             self.baglanti_sayisi = len(self.komsular)
 
-    # -------------------------------
-    # JSON için yardımcı metodlar
-    # -------------------------------
+    
     def to_dict(self):
         return {
             "id": self.id,
@@ -59,9 +53,7 @@ class Node:
             komsular=data.get("komsular", [])
         )
 
-    # -------------------------------
-    # Debug / yazdırma
-    # -------------------------------
+    
     def __repr__(self):
         return (
             f"Node(id={self.id}, name='{self.name}', "

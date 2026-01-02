@@ -18,20 +18,16 @@ class Graph:
         if os.path.exists(self.data_path):
             self.load_from_json(self.data_path)
 
-    # =========================
-    # CSV İŞLEMLERİ (YENİ)
-    # =========================
+    
     def load_from_csv(self, path):
         import csv
         import random
         self.nodes = []
         self.edges = []
         
-        # Helper to get or create node
         def get_or_create(nid):
             n = self.get_node_by_id(nid)
             if not n:
-                # Randomize attributes
                 act = round(random.uniform(0.1, 1.0), 2)
                 inter = random.randint(1, 100)
                 n = Node(nid, f"Node {nid}", act, inter) 
@@ -42,7 +38,6 @@ class Graph:
             reader = csv.reader(f)
             for row in reader:
                 if len(row) < 2: continue
-                # Expected: Source, Target, [Weight]
                 try:
                     s_id = int(row[0])
                     t_id = int(row[1])
@@ -54,19 +49,16 @@ class Graph:
                     if not self.edge_exists(s_id, t_id):
                         self.edges.append(Edge(s_id, t_id, w))
                         
-                        # Update neighbors
                         if t_id not in n1.komsular: n1.komsular.append(t_id)
                         if s_id not in n2.komsular: n2.komsular.append(s_id)
                         n1.baglanti_sayisi = len(n1.komsular)
                         n2.baglanti_sayisi = len(n2.komsular)
                 except ValueError:
-                    continue # Skip header or invalid rows
+                    continue 
 
         self._autosave()
 
-    # =========================
-    # JSON İŞLEMLERİ
-    # =========================
+   
     def load_from_json(self, path):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -115,13 +107,11 @@ class Graph:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
     def export_adjacency_matrix(self, path):
-        # Nodes sorted by ID for consistency
         sorted_nodes = sorted(self.nodes, key=lambda n: n.id)
         node_ids = [n.id for n in sorted_nodes]
         n_count = len(node_ids)
         
-        # Build matrix
-        # Row header: Node IDs
+        
         matrix = []
         header = [""] + [str(nid) for nid in node_ids]
         matrix.append(header)
@@ -144,9 +134,7 @@ class Graph:
         if self.autosave and self.data_path:
             self.save_to_json(self.data_path)
 
-    # =========================
-    # NODE İŞLEMLERİ
-    # =========================
+    
     def get_node_by_id(self, node_id):
         for node in self.nodes:
             if node.id == node_id:
@@ -201,9 +189,7 @@ class Graph:
 
         self._autosave()
 
-    # =========================
-    # AĞIRLIK HESAPLAMA
-    # =========================
+    
     def calculate_weight(self, node1: Node, node2: Node):
         return 1 / (
             1
@@ -212,9 +198,7 @@ class Graph:
             + (node1.baglanti_sayisi - node2.baglanti_sayisi) ** 2
         )
 
-    # =========================
-    # EDGE İŞLEMLERİ
-    # =========================
+    
     def edge_exists(self, source_id, target_id):
         for e in self.edges:
             if (e.source == source_id and e.target == target_id) or \
@@ -238,7 +222,6 @@ class Graph:
         weight = self.calculate_weight(node1, node2)
         self.edges.append(Edge(source_id, target_id, weight))
 
-        # komşuluk tekrarını engelle
         if target_id not in node1.komsular:
             node1.komsular.append(target_id)
         if source_id not in node2.komsular:
@@ -250,7 +233,6 @@ class Graph:
         self._autosave()
         
     def remove_edge(self, source_id, target_id):
-    # Edge var mı?
         removed = False
         new_edges = []
 
@@ -265,7 +247,6 @@ class Graph:
 
         self.edges = new_edges
 
-    # Komşulukları güncelle
         n1 = self.get_node_by_id(source_id)
         n2 = self.get_node_by_id(target_id)
 
@@ -283,9 +264,7 @@ class Graph:
 
         
 
-    # =========================
-    # BFS (Breadth First Search)
-    # =========================
+    
     def bfs(self, start_node_id):
         start_node = self.get_node_by_id(start_node_id)
         if start_node is None:
@@ -311,9 +290,7 @@ class Graph:
         print("BFS sonucu:", result)
         return result
 
-    # =========================
-    # DFS (Depth First Search)
-    # =========================
+    
     def dfs(self, start_node_id):
         start_node = self.get_node_by_id(start_node_id)
         if start_node is None:
@@ -336,19 +313,15 @@ class Graph:
         print("DFS sonucu:", result)
         return result
     
-        # =========================
-    # Connected Components
-    # =========================
+       
     def connected_components(self):
         visited = set()
         components = []
 
-    # Tüm node’ları dolaş (izole node dahil)
         for node in self.nodes:
             if node.id in visited:
                 continue
 
-        # Yeni bileşen başlat
             comp = []
             stack = [node.id]
             visited.add(node.id)
@@ -371,27 +344,20 @@ class Graph:
         return components
 
 
-                # =========================
-    # Degree Centrality (Top 5)
-    # =========================
+               
     def degree_centrality_top5(self):
-        # (node_id, degree) listesi
         degrees = [(n.id, len(n.komsular)) for n in self.nodes]
 
-        # degree büyükten küçüğe sırala
         degrees.sort(key=lambda x: x[1], reverse=True)
 
-        # ilk 5
         return degrees[:5]
 
-    # =========================
-    # Dijkstra En Kısa Yol
-    # =========================
+    
     def dijkstra(self, start_id, end_id):
         if self.get_node_by_id(start_id) is None or self.get_node_by_id(end_id) is None:
             raise ValueError("Başlangıç veya hedef node bulunamadı")
 
-        # Mesafeler
+        
         distances = {node.id: float("inf") for node in self.nodes}
         previous = {node.id: None for node in self.nodes}
 
@@ -411,10 +377,6 @@ class Graph:
                     continue
 
                 neighbor_node = self.get_node_by_id(neighbor_id)
-                # İsterlerde "Ağırlık = Maliyet" dense de, formül benzer düğümlere YÜKSEK ağırlık veriyor.
-                # Dijkstra EN AZ maliyetli (en kısa) yolu arar.
-                # Benzer düğümleri tercih etmek için Maliyet = 1 / Ağırlık (veya benzeri) olmalı.
-                # Burada 1/weight kullanıyoruz ki Yüksek Ağırlık -> Düşük Maliyet olsun.
                 weight_val = self.calculate_weight(current_node, neighbor_node)
                 cost = 1.0 / weight_val if weight_val > 0 else float('inf')
                 
@@ -424,7 +386,6 @@ class Graph:
                     distances[neighbor_id] = new_dist
                     previous[neighbor_id] = current
 
-        # Yol oluşturma
         path = []
         current = end_id
         while current is not None:
@@ -436,14 +397,9 @@ class Graph:
 
         return path, distances[end_id]
     
-        # =========================
-    # A* (A-Star) En Kısa Yol
-    # =========================
+       
     def heuristic(self, node1: Node, node2: Node):
-        # Maliyet olarak (1/Weight) ~ (1 + Farklar^2) kullanıyoruz.
-        # Heuristic, maliyet ile uyumlu olmalı (Underestimation for admissibility).
-        # (1 + Diff^2) >= Diff.
-        # Basitçe farkların toplamını kullanmak (Manhattan benzeri) makul bir yaklaşımdır.
+        
         return (
             abs(node1.aktiflik - node2.aktiflik)
             + abs(node1.etkilesim - node2.etkilesim)
@@ -470,7 +426,6 @@ class Graph:
             current = min(open_set, key=lambda nid: f_score[nid])
 
             if current == end_id:
-                # Yol oluştur
                 path = [current]
                 while current in came_from:
                     current = came_from[current]
@@ -498,18 +453,15 @@ class Graph:
 
         raise ValueError("Bu iki node arasında yol yok")
     
-    # =========================
-    # Welsh–Powell Graph Coloring
-    # =========================
+    
     def welsh_powell(self):
-        # Node'ları dereceye göre büyükten küçüğe sırala
         sorted_nodes = sorted(
             self.nodes,
             key=lambda n: n.baglanti_sayisi,
             reverse=True
         )
 
-        color_of = {}   # node_id -> color_index
+        color_of = {}   
         current_color = 0
 
         for node in sorted_nodes:
@@ -522,7 +474,6 @@ class Graph:
                 if other.id in color_of:
                     continue
 
-                # Komşuların rengiyle çakışıyor mu?
                 conflict = False
                 for komsu in other.komsular:
                     if color_of.get(komsu) == current_color:
@@ -536,9 +487,7 @@ class Graph:
 
         return color_of
 
-    # =========================
-    # Spring Layout (Fruchterman-Reingold)
-    # =========================
+   
     def spring_layout(self, width=1200, height=800, iterations=50):
         """
         Basit bir yay-kütle (Spring-Force) yerleşim algoritması.
@@ -551,20 +500,18 @@ class Graph:
         if n == 0: return {}
         if n == 1: return {nodes[0].id: (width/2, height/2)}
 
-        # 1. Başlangıç pozisyonları (Rastgele)
         positions = {node.id: [random.uniform(100, width-100), random.uniform(100, height-100)] for node in nodes}
         
-        # Sabitler
         area = width * height
         k = math.sqrt(area / n)
         
-        t = width / 10 # Başlangıç sıcaklığı
+        t = width / 10 
         dt = t / (iterations + 1)
 
         for i in range(iterations):
             disp = {node.id: [0.0, 0.0] for node in nodes}
 
-            # 2. İtme Kuvvetleri (Repulsive) - Herkes herkesi iter
+            
             for v_node in nodes:
                 v = v_node.id
                 v_pos = positions[v]
@@ -578,12 +525,10 @@ class Graph:
                     delta_y = v_pos[1] - u_pos[1]
                     dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
                     
-                    # Fr = k^2 / d
                     force = (k * k) / dist
                     disp[v][0] += (delta_x / dist) * force
                     disp[v][1] += (delta_y / dist) * force
 
-            # 3. Çekme Kuvvetleri (Attractive) - Sadece bağlı olanlar
             for edge in self.edges:
                 v = edge.source
                 u = edge.target
@@ -596,34 +541,26 @@ class Graph:
                 delta_y = v_pos[1] - u_pos[1]
                 dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
                 
-                # Fa = d^2 / k
                 force = (dist * dist) / k
                 
-                # v -> u çekilir
                 disp[v][0] -= (delta_x / dist) * force
                 disp[v][1] -= (delta_y / dist) * force
                 
-                # u -> v çekilir
                 disp[u][0] += (delta_x / dist) * force
                 disp[u][1] += (delta_y / dist) * force
 
-            # 4. Pozisyon Güncelleme
             for node in nodes:
                 v = node.id
                 d_len = math.sqrt(disp[v][0]**2 + disp[v][1]**2) or 0.01
                 
-                # Sıcaklık ile sınırla
                 step = min(d_len, t)
                 
                 positions[v][0] += (disp[v][0] / d_len) * step
                 positions[v][1] += (disp[v][1] / d_len) * step
                 
-                # Sınırlar içinde tut
                 positions[v][0] = min(width-50, max(50, positions[v][0]))
                 positions[v][1] = min(height-50, max(50, positions[v][1]))
 
-            # Soğutma
             t -= dt
 
-        # Tuple olarak döndür
         return {nid: (pos[0], pos[1]) for nid, pos in positions.items()}

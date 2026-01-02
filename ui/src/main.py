@@ -13,7 +13,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QBrush, QPen, QPainter, QColor, QFont, QRadialGradient
 from PyQt5.QtCore import Qt, QPointF, pyqtSignal
 
-# Fix for module search path if needed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from ui.src.graph import Graph
@@ -25,9 +24,7 @@ from ui.src.styles import (
 )
 from ui.src.dashboard import DashboardWidget
 
-# =========================
-# UTILS & WIDGETS
-# =========================
+
 class Panel(QFrame):
     def __init__(self, title=None):
         super().__init__()
@@ -55,16 +52,13 @@ class GlossyButton(QPushButton):
         self.setStyleSheet(BUTTON_STYLE)
         self.setCursor(Qt.PointingHandCursor)
 
-# =========================
-# GRAPHICS ITEMS
-# =========================
+
 class NodeItem(QGraphicsEllipseItem):
     def __init__(self, node, x, y, r=22, color="#4cc9f0"):
         super().__init__(0, 0, 2*r, 2*r)
         self.node = node
         self.setPos(x - r, y - r)
         
-        # Gradient Fill
         c = QColor(color)
         grad = QRadialGradient(r, r, r)
         grad.setColorAt(0, c.lighter(130))
@@ -76,10 +70,7 @@ class NodeItem(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
         
-        # Shadow Effect (Simulated via Z and darker circle behind? - Simplified here)
         
-        # Label (ID) - Center
-        # For 'Sosialex' maybe show icon? Let's just show ID clearly
         label = QGraphicsTextItem(str(node.id), self)
         label.setDefaultTextColor(Qt.white)
         font = QFont("Segoe UI", 10, QFont.Bold)
@@ -115,50 +106,36 @@ class EdgeItem(QGraphicsLineItem):
         pen.setCapStyle(Qt.RoundCap)
         self.setPen(pen)
         
-        # Tooltip
         self.setAcceptHoverEvents(True)
         self.setToolTip(f"Edge: {edge.source}-{edge.target}\nAğırlık: {edge.weight:.4f}")
 
-        # Text Label (Visual)
         mid_x = (p1.x() + p2.x()) / 2
         mid_y = (p1.y() + p2.y()) / 2
         
         self.text = QGraphicsTextItem(f"{edge.weight:.2f}", self)
-        # Center the text
         rect = self.text.boundingRect()
         self.text.setPos(mid_x - rect.width()/2, mid_y - rect.height()/2)
         
-        # Style
         self.text.setDefaultTextColor(QColor("#a5b4fc")) # Light Indigo
         font = QFont("Arial", 9)
         self.text.setFont(font)
         
-        # Background for text
-        # (Optional: could add a rect behind, but let's try simple text first to avoid clutter)
 
-# =========================
-# MAIN WINDOW
-# =========================
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sosyal Ağ Analiz Uygulaması")
         self.resize(1450, 900)
-        # self.setStyleSheet(MAIN_APP_STYLE)  <-- Moved to main for global scope
         
         self.graph = Graph()
-        self.is_colored = False  # Track if coloring should be applied
+        self.is_colored = False  
         
-        # Highlighting State
         self.highlight_nodes = set()
-        self.highlight_edges = set() # Set of tuples (u, v)
+        self.highlight_edges = set() 
         
-        # Main Layout
-        # Main Layout
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
         
-        # PAGE 0: Graph Editor (Existing)
         self.page_editor = QWidget()
         self.stack.addWidget(self.page_editor)
         
@@ -166,33 +143,25 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # header
         self.create_header(main_layout)
         
-        # Body
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(10, 10, 10, 10)
         body_layout.setSpacing(10)
         main_layout.addLayout(body_layout)
         
-        # LEFT COL
         self.create_left_col(body_layout)
         
-        # CENTER COL
         self.create_center_col(body_layout)
         
-        # RIGHT COL
         self.create_right_col(body_layout)
         
-        # PAGE 1: Dashboard (Placeholder, init on demand or now)
-        # We will init on demand to refresh data, or refresh on show.
-        # Let's create a container for it.
+       
         self.page_dashboard_container = QWidget()
         self.stack.addWidget(self.page_dashboard_container)
         dash_layout = QVBoxLayout(self.page_dashboard_container)
         dash_layout.setContentsMargins(0,0,0,0)
         
-        # Initial Draw
         self.draw_graph()
 
     def create_header(self, parent_layout):
@@ -204,15 +173,13 @@ class MainWindow(QMainWindow):
         hl = QHBoxLayout(header)
         hl.setContentsMargins(20, 0, 20, 0)
         
-        # Centered Logo/Text
-        hl.addStretch() # Push title to center
+        hl.addStretch() 
         title = QLabel("Sosyal Ağ Analiz Uygulaması")
         title.setObjectName("AppTitle")
         title.setAlignment(Qt.AlignCenter)
         hl.addWidget(title)
-        hl.addStretch() # Push icons to right
+        hl.addStretch() 
         
-        # Dummy system icons
         sys_icons = QLabel("🎥 🎤 ⚙️ ★")
         sys_icons.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 16px;")
         hl.addWidget(sys_icons)
@@ -226,7 +193,6 @@ class MainWindow(QMainWindow):
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(10)
         
-        # 1. Graf İşlemleri
         p1 = Panel("Graf İşlemleri")
         
         b1 = GlossyButton("+ Node Ekle")
@@ -247,7 +213,6 @@ class MainWindow(QMainWindow):
         
         l.addWidget(p1)
         
-        # 2. Veri Aktarımı
         p2 = Panel("Veri Aktarımı")
         b_save = GlossyButton("💾 Kaydet (JSON)")
         b_save.clicked.connect(self.save_graph)
@@ -267,7 +232,6 @@ class MainWindow(QMainWindow):
         
         l.addWidget(p2)
         
-        # 3. Algoritmalar
         p3 = Panel("Algoritmalar")
         
         b_algo1 = GlossyButton("BFS / DFS")
@@ -304,24 +268,20 @@ class MainWindow(QMainWindow):
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(10)
         
-        # TOP: Graph Canvas
         self.scene = QGraphicsScene()
         self.scene.setBackgroundBrush(QBrush(QColor(COLORS["background"])))
         self.scene.selectionChanged.connect(self.on_selection_changed)
-        # Graphics View
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing)
         self.view.setStyleSheet(f"background-color: {COLORS['background']}; border: none; border-radius: 8px;")
         l.addWidget(self.view, stretch=2)
         
-        # BOTTOM: Controls (Results | Settings | Coloring)
         bottom_container = QWidget()
         bottom_container.setFixedHeight(280)
         bl = QHBoxLayout(bottom_container)
         bl.setContentsMargins(0, 0, 0, 0)
         bl.setSpacing(10)
         
-        # P1: Sonuçlar (Table)
         self.panel_results = Panel("Sonuçlar")
         self.res_table = QTableWidget(5, 2)
         self.res_table.setHorizontalHeaderLabels(["Key", "Value"])
@@ -331,42 +291,35 @@ class MainWindow(QMainWindow):
         self.panel_results.add_widget(self.res_table)
         bl.addWidget(self.panel_results, stretch=1)
         
-        # P2: Algoritma Ayarları (Inputs)
         self.panel_settings = Panel("Algoritma Ayarları")
         
-        # 1. Row: Algoritma Seçimi
         self.panel_settings.add_widget(QLabel("Algoritma:"))
         self.algo_combo = QComboBox()
         self.algo_combo.addItems(["Dijkstra", "A*", "BFS", "DFS"])
         self.algo_combo.setStyleSheet(INPUT_STYLE)
         self.panel_settings.add_widget(self.algo_combo)
 
-        # 2. Row: Başlangıç Node
         self.panel_settings.add_widget(QLabel("Başlangıç ID:"))
         self.inp_start = QLineEdit()
         self.inp_start.setPlaceholderText("Seçili veya ID (Örn: 1)")
         self.inp_start.setStyleSheet(INPUT_STYLE)
         self.panel_settings.add_widget(self.inp_start)
 
-        # 3. Row: Hedef Node
         self.inp_target = QLineEdit()
         self.inp_target.setPlaceholderText("Node ID (Örn: 5)")
         self.inp_target.setStyleSheet(INPUT_STYLE)
         self.panel_settings.add_widget(QLabel("Hedef:"))
         self.panel_settings.add_widget(self.inp_target)
 
-        # 4. Row: Çalıştır Butonu
         self.btn_run_algo = GlossyButton("🚀 Çalıştır")
         self.btn_run_algo.clicked.connect(self.run_algorithm_settings)
         self.panel_settings.add_widget(self.btn_run_algo)
         
         bl.addWidget(self.panel_settings, stretch=1)
         
-        # P3: Graf Renklendirme
         self.panel_color = Panel("Graf Renklendirme")
         self.panel_color.add_widget(QLabel("Topluluk Tespiti ve Renklendirme"))
         
-        # Color dots (Mock)
         dots = QLabel("🔴 🔵 🟢 🟡")
         dots.setAlignment(Qt.AlignCenter)
         dots.setStyleSheet("font-size: 20px; padding: 10px;")
@@ -387,13 +340,11 @@ class MainWindow(QMainWindow):
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(10)
         
-        # 1. Düğüm Bilgisi (Inspector)
         self.p_inspector = Panel("Düğüm Bilgisi")
         self.lbl_insp_id = QLabel("Seçili: Yok")
         self.lbl_insp_id.setStyleSheet(f"font-size: 14px; color: {COLORS['accent_green']}; font-weight: bold;")
         self.p_inspector.add_widget(self.lbl_insp_id)
         
-        # Inputs for editing
         self.edit_name = QLineEdit()
         self.edit_name.setPlaceholderText("Kullanıcı Adı")
         self.edit_name.setStyleSheet(INPUT_STYLE)
@@ -419,34 +370,27 @@ class MainWindow(QMainWindow):
 
         l.addWidget(self.p_inspector)
         
-        # 2. İstatistikler (Real Data)
         self.p_stats = Panel("İstatistikler")
         
         self.lbl_stat_nodes = QLabel("Toplam Node: 0")
         self.lbl_stat_edges = QLabel("Toplam Edge: 0")
         self.lbl_stat_density = QLabel("Yoğunluk: 0.00")
         
-        # Style them
         for lbl in [self.lbl_stat_nodes, self.lbl_stat_edges, self.lbl_stat_density]:
             lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 13px; margin-left: 5px;")
             self.p_stats.add_widget(lbl)
             
         l.addWidget(self.p_stats)
         
-        # 3. Performans
         p_perf = Panel("Performans")
         self.lbl_perf_time = QLabel("Çalışma Süresi: -")
         p_perf.add_widget(self.lbl_perf_time)
-        # self.lbl_perf_mem = QLabel("Bellek Kullanımı: -") 
-        # p_perf.add_widget(self.lbl_perf_mem) # Memory is harder to track precisely in Python in realtime without overhead
         l.addWidget(p_perf)
         
         l.addStretch()
         parent_layout.addWidget(container)
 
-    # =========================
-    # LOGIC
-    # =========================
+    
     def update_stats(self):
         n = len(self.graph.nodes)
         m = len(self.graph.edges)
@@ -454,7 +398,6 @@ class MainWindow(QMainWindow):
         self.lbl_stat_nodes.setText(f"Toplam Node: {n}")
         self.lbl_stat_edges.setText(f"Toplam Edge: {m}")
         
-        # Density for undirected graph: 2*m / (n*(n-1))
         density = 0
         if n > 1:
             density = (2 * m) / (n * (n - 1))
@@ -468,7 +411,6 @@ class MainWindow(QMainWindow):
         nodes = self.graph.nodes
         n = len(nodes)
         
-        # Determine colors
         colors = {}
         if self.is_colored:
             try:
@@ -477,45 +419,38 @@ class MainWindow(QMainWindow):
                 colors = {}
         
         palette = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#073b4c"]
-        default_color = "#0ea5e9" # Accent Blue for uncolored state
+        default_color = "#0ea5e9" 
 
-        # SPRING LAYOUT (Improved)
         if n == 0: return
 
-        # Calculate layout using backend
+        
         layout_positions = self.graph.spring_layout(width=2000, height=2000, iterations=80)
-        # Assuming scene needs to be adjusted or we center it? 
-        # The graph returns coordinates in range (0,0) to (2000,2000).
-        # MainWindow view is likely smaller, but QGraphicsView supports scrolling/zoom.
-        # Let's map them somewhat centrally initially.
         
         positions = {}
         for nid, (lx, ly) in layout_positions.items():
              positions[nid] = QPointF(lx, ly)
 
-        # Edges
+       
         for e in self.graph.edges:
             if e.source in positions and e.target in positions:
-                # Check for highlight
                 ec = None
                 if (e.source, e.target) in self.highlight_edges or (e.target, e.source) in self.highlight_edges:
                     ec = "#10b981" # Green
                 self.scene.addItem(EdgeItem(e, positions[e.source], positions[e.target], color=ec))
                 
-        # Nodes
+       
         for node in nodes:
             if node.id in positions:
                 c = default_color
                 if self.is_colored:
                      c = palette[colors.get(node.id, 0) % len(palette)]
                 
-                # Overwrite if highlighted
+               
                 if node.id in self.highlight_nodes:
                     c = "#10b981" # Green
                     
                 self.scene.addItem(NodeItem(node, positions[node.id].x(), positions[node.id].y(), color=c))
 
-        # Auto fit to view
         self.scene.setSceneRect(self.scene.itemsBoundingRect())
         self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
 
@@ -549,7 +484,6 @@ class MainWindow(QMainWindow):
             self.graph.update_node(nid, name=name, aktiflik=act, etkilesim=inter)
             self.draw_graph()
             
-            # Re-select to keep focus
             for item in self.scene.items():
                 if isinstance(item, NodeItem) and item.node.id == nid:
                     item.setSelected(True)
@@ -559,10 +493,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Hata", str(e))
 
-    # --- Actions ---
-    # Need to reimplement or copy Dialogs?
-    # I will create simple input dialogs for brevity to avoid file bloat, or we assume they exist.
-    # To Ensure functionality, I'll add minimal dialogs inline here (same as before).
+   
     
     def run_algo_dialog(self, type):
         dlg = TraverseDialog(self.graph)
@@ -585,8 +516,7 @@ class MainWindow(QMainWindow):
 
     def run_algorithm_settings(self):
         try:
-            # 1. Get Start Node
-            # Priority: Input Field > Selected Node
+            
             start_id = None
             inp_sid_str = self.inp_start.text().strip()
             if inp_sid_str.isdigit():
@@ -600,7 +530,6 @@ class MainWindow(QMainWindow):
 
             algo_type = self.algo_combo.currentText()
             
-            # 2. Get Target for Pathfinding
             target_str = self.inp_target.text().strip()
             target_id = int(target_str) if target_str.isdigit() else None
             
@@ -615,7 +544,7 @@ class MainWindow(QMainWindow):
         
         try:
             result_msg = ""
-            results_for_table = [] # List of (Key, Value) tuples
+            results_for_table = [] 
             
             if algo_type in ["Dijkstra", "A*"]:
                 if target_id is None:
@@ -625,20 +554,18 @@ class MainWindow(QMainWindow):
                 if algo_type == "Dijkstra":
                     path, cost = self.graph.dijkstra(start_id, target_id)
                     title = "Dijkstra"
-                else: # A*
+                else: 
                     path, cost = self.graph.astar(start_id, target_id)
                     title = "A*"
                 
                 result_msg = f"{title} Sonuç:\nYol: {path}\nMaliyet: {cost:.2f}"
                 
-                # Highlight Path
                 self.highlight_nodes = set(path)
                 self.highlight_edges = set()
                 for i in range(len(path)-1):
                     self.highlight_edges.add((path[i], path[i+1]))
                 self.draw_graph()
 
-                # Prepare Table Data
                 results_for_table.append(("Algoritma", title))
                 results_for_table.append(("Maliyet", f"{cost:.2f}"))
                 results_for_table.append(("Adım Sayısı", str(len(path))))
@@ -653,33 +580,26 @@ class MainWindow(QMainWindow):
                 
                 result_msg = f"{algo_type} Ziyaret Sırası:\n{res}"
                 
-                # Highlight Visited
                 self.highlight_nodes = set(res)
                 self.highlight_edges = set() 
-                # Optional: highlight edges in traversal order? 
-                # For BFS/DFS pure traversal, maybe just nodes is cleaner, or edges if known.
-                # Let's just highlight nodes for now to match 'Gidilen yol' conceptual for traversal.
+                
                 self.draw_graph()
                 
-                # Prepare Table Data
                 results_for_table.append(("Algoritma", algo_type))
                 results_for_table.append(("Toplam Node", str(len(res))))
                 for i, node_id in enumerate(res):
                     results_for_table.append((f"{i+1}. Sıra", f"Node {node_id}"))
 
-            # Update Table
             self.res_table.setRowCount(len(results_for_table))
             for i, (key, val) in enumerate(results_for_table):
                 self.res_table.setItem(i, 0, QTableWidgetItem(str(key)))
                 self.res_table.setItem(i, 1, QTableWidgetItem(str(val)))
 
-            # Timing end
             t_end = time.perf_counter()
             duration_ms = (t_end - t_start) * 1000.0
             self.lbl_perf_time.setText(f"Çalışma Süresi: {duration_ms:.4f} ms")
 
-            # Optional: Show popup? User asked for table, maybe popup is annoying if repeated.
-            # Keeping popup for now as it's explicit feedback.
+            
             QMessageBox.information(self, "Sonuç", result_msg)
             
         except Exception as e:
@@ -693,8 +613,7 @@ class MainWindow(QMainWindow):
 
     def open_dashboard(self):
         try:
-            # Re-create dashboard to ensure fresh data
-            # Remove old dashboard if exists
+            
             if self.page_dashboard_container.layout().count() > 0:
                 item = self.page_dashboard_container.layout().takeAt(0)
                 if item.widget():
@@ -732,7 +651,7 @@ class MainWindow(QMainWindow):
         if path:
             try:
                 self.graph.load_from_csv(path)
-                self.is_colored = False # Reset coloring on new load
+                self.is_colored = False 
                 self.highlight_nodes.clear()
                 self.highlight_edges.clear()
                 self.draw_graph()
@@ -749,7 +668,6 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.warning(self, "Hata", str(e))
 
-    # Minimal Dialog wrappers so buttons work
     def open_add_node(self):
         if AddNodeDialog(self.graph).exec_(): self.draw_graph()
     def open_delete_node(self):
@@ -780,40 +698,30 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Bilgi", "Renklendirilecek düğüm yok.")
                 return
 
-            # Enable coloring mode
             self.is_colored = True
             
-            # Clear Highlights
             self.highlight_nodes.clear()
             self.highlight_edges.clear()
 
-            # Chromatic number is max color index + 1 (since 0-indexed)
             chromatic_number = max(colors.values()) + 1
             
-            # Palette used in draw_graph for reference
             palette_names = ["Kırmızı", "Sarı", "Yeşil", "Mavi", "Koyu Lacivert"]
 
-            # Update Table
-            # Rows: Algo Name, Chromatic Num, Header, [Node...Color]
             total_rows = 2 + 1 + len(colors) 
             self.res_table.setRowCount(total_rows)
             
-            # Summary
             self.res_table.setItem(0, 0, QTableWidgetItem("Algoritma"))
             self.res_table.setItem(0, 1, QTableWidgetItem("Welsh-Powell"))
             
             self.res_table.setItem(1, 0, QTableWidgetItem("Kromatik Sayı"))
             self.res_table.setItem(1, 1, QTableWidgetItem(str(chromatic_number)))
             
-            # Separator / Header
             header_item = QTableWidgetItem("--- Detaylar ---")
             header_item.setBackground(QColor(COLORS['panel']))
             header_item.setForeground(QColor(COLORS['accent_cyan']))
             self.res_table.setItem(2, 0, header_item)
             self.res_table.setItem(2, 1, QTableWidgetItem(""))
 
-            # Node Details
-            # Sort by color then ID for nicer list
             sorted_items = sorted(colors.items(), key=lambda x: (x[1], x[0]))
             
             for i, (nid, c_idx) in enumerate(sorted_items):
@@ -822,7 +730,6 @@ class MainWindow(QMainWindow):
                 self.res_table.setItem(row, 0, QTableWidgetItem(f"Node {nid}"))
                 self.res_table.setItem(row, 1, QTableWidgetItem(f"{color_name} (Kod: {c_idx})"))
             
-            # Re-draw to ensure colors are applied
             self.draw_graph()
             
             QMessageBox.information(self, "Başarılı", f"Graf renklendirildi.\nKromatik Sayı: {chromatic_number}\nDetaylar tabloda listelendi.")
@@ -830,7 +737,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Hata", str(e))
 
-# --- DIALOG CLASSES (Simplified for file size) ---
 class BaseDialog(QDialog):
     def __init__(self): 
         super().__init__()
@@ -955,7 +861,6 @@ class ZoomableGraphicsView(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
-        # Enable Scrollbars
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
@@ -965,33 +870,26 @@ class ZoomableGraphicsView(QGraphicsView):
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)
         
-        # Grid settings
         grid_size = 40
-        grid_color = QColor(255, 255, 255, 30) # More visible white (Alpha 10 -> 30)
+        grid_color = QColor(255, 255, 255, 30) 
         
         painter.setPen(QPen(grid_color, 1))
         
-        # Calculate start/end based on visible rect or scene rect
-        # Using scene rect usually, but rect arg is the exposed rect
         l = int(rect.left())
         r = int(rect.right())
         t = int(rect.top())
         b = int(rect.bottom())
         
-        # Snap to grid
         start_x = l - (l % grid_size)
         start_y = t - (t % grid_size)
         
-        # Vertical lines
         for x in range(start_x, r, grid_size):
             painter.drawLine(x, t, x, b)
             
-        # Horizontal lines
         for y in range(start_y, b, grid_size):
             painter.drawLine(l, y, r, y)
 
     def mousePressEvent(self, event):
-        # Allow Right Click OR Middle Click for panning
         if event.button() == Qt.RightButton or event.button() == Qt.MiddleButton:
             self._panning = True
             self._pan_start = event.pos()
@@ -1023,10 +921,8 @@ class ZoomableGraphicsView(QGraphicsView):
         zoom_in_factor = 1.25
         zoom_out_factor = 1 / zoom_in_factor
 
-        # Save the scene pos
         old_pos = self.mapToScene(event.pos())
 
-        # Zoom
         if event.angleDelta().y() > 0:
             zoom_factor = zoom_in_factor
         else:
@@ -1034,16 +930,14 @@ class ZoomableGraphicsView(QGraphicsView):
         
         self.scale(zoom_factor, zoom_factor)
 
-        # Get the new position
         new_pos = self.mapToScene(event.pos())
 
-        # Move scene to old position
         delta = new_pos - old_pos
         self.translate(delta.x(), delta.y())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setStyleSheet(MAIN_APP_STYLE) # Apply style globally to fix dialogs/modals
+    app.setStyleSheet(MAIN_APP_STYLE) 
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
