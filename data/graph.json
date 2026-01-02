@@ -42,11 +42,12 @@
             "name": "Node 4",
             "aktiflik": 0.71,
             "etkilesim": 47,
-            "baglanti_sayisi": 3,
+            "baglanti_sayisi": 4,
             "komsular": [
                 3,
                 5,
-                14
+                14,
+                29
             ]
         },
         {
@@ -130,10 +131,11 @@
             "name": "Node 11",
             "aktiflik": 0.18,
             "etkilesim": 18,
-            "baglanti_sayisi": 2,
+            "baglanti_sayisi": 3,
             "komsular": [
                 10,
-                12
+                12,
+                29
             ]
         },
         {
@@ -364,12 +366,14 @@
             "name": "Node 29",
             "aktiflik": 0.57,
             "etkilesim": 62,
-            "baglanti_sayisi": 4,
+            "baglanti_sayisi": 6,
             "komsular": [
                 28,
                 30,
                 19,
-                39
+                39,
+                4,
+                11
             ]
         },
         {
@@ -879,6 +883,16 @@
             "from": 15,
             "to": 35,
             "weight": 6.0
+        },
+        {
+            "from": 29,
+            "to": 4,
+            "weight": 0.004404906008115599
+        },
+        {
+            "from": 29,
+            "to": 11,
+            "weight": 0.0005138344531241931
         }
     ]
 }

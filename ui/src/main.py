@@ -128,7 +128,8 @@ class MainWindow(QMainWindow):
         self.resize(1450, 900)
         
         self.graph = Graph()
-        self.is_colored = False  
+        self.is_colored = False
+        self.community_threshold = 0.0  
         
         self.highlight_nodes = set()
         self.highlight_edges = set() 
@@ -432,6 +433,10 @@ class MainWindow(QMainWindow):
 
        
         for e in self.graph.edges:
+            # Filter by community threshold
+            if e.weight < self.community_threshold:
+                continue
+                
             if e.source in positions and e.target in positions:
                 ec = None
                 if (e.source, e.target) in self.highlight_edges or (e.target, e.source) in self.highlight_edges:
@@ -639,6 +644,7 @@ class MainWindow(QMainWindow):
             
             self.graph.load_from_json(self.graph.data_path)
             self.is_colored = False
+            self.community_threshold = 0.0
             self.highlight_nodes.clear()
             self.highlight_edges.clear()
             self.draw_graph()
@@ -651,7 +657,8 @@ class MainWindow(QMainWindow):
         if path:
             try:
                 self.graph.load_from_csv(path)
-                self.is_colored = False 
+                self.is_colored = False
+                self.community_threshold = 0.0 
                 self.highlight_nodes.clear()
                 self.highlight_edges.clear()
                 self.draw_graph()
@@ -685,15 +692,25 @@ class MainWindow(QMainWindow):
              else:
                  QMessageBox.warning(self, "Hata", "Lütfen geçerli sayısal ID'ler giriniz.")
     def show_components(self):
-        comps = self.graph.connected_components()
-        self.res_table.setRowCount(len(comps))
-        for i, c in enumerate(comps):
-             self.res_table.setItem(i, 0, QTableWidgetItem(f"Grup {i+1}"))
-             self.res_table.setItem(i, 1, QTableWidgetItem(str(c)))
+        dlg = ThresholdDialog()
+        if dlg.exec_():
+            thresh = dlg.get_value()
+            self.community_threshold = thresh
+            
+            comps = self.graph.connected_components(thresh)
+            
+            self.res_table.setRowCount(len(comps))
+            for i, c in enumerate(comps):
+                 self.res_table.setItem(i, 0, QTableWidgetItem(f"Grup {i+1}"))
+                 self.res_table.setItem(i, 1, QTableWidgetItem(str(c)))
+            
+            # Update visualization to show disconnected components / filtered edges
+            self.draw_graph()
+            QMessageBox.information(self, "Analiz Tamamlandı", f"{len(comps)} adet topluluk bulundu.\nTablo güncellendi.\nGrafik eşik değerine göre filtrelendi.")
 
     def run_coloring(self):
         try:
-            colors = self.graph.welsh_powell()
+            colors = self.graph.welsh_powell(self.community_threshold)
             if not colors:
                 QMessageBox.information(self, "Bilgi", "Renklendirilecek düğüm yok.")
                 return
@@ -804,6 +821,29 @@ class DeleteEdgeDialog(BaseDialog):
         l.addWidget(QLabel("1. ID")); l.addWidget(self.i1)
         l.addWidget(QLabel("2. ID")); l.addWidget(self.i2)
         b=QPushButton("Sil"); b.clicked.connect(lambda: (self.g.remove_edge(int(self.i1.text()), int(self.i2.text())), self.accept())); l.addWidget(b)
+
+class ThresholdDialog(BaseDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Topluluk Analizi Parametreleri")
+        l = QVBoxLayout(self)
+        l.addWidget(QLabel("Benzerlik Eşik Değeri (Threshold)"))
+        self.inp = QLineEdit()
+        self.inp.setPlaceholderText("0.0 - 1.0 arası (Örn: 0.5)")
+        self.inp.setText("0.0")
+        l.addWidget(self.inp)
+        
+        l.addWidget(QLabel("Açıklama: Bu değerden DÜŞÜK ağırlıklı kenarlar koparılır."))
+        
+        b = GlossyButton("Analiz Et")
+        b.clicked.connect(self.accept)
+        l.addWidget(b)
+        
+    def get_value(self):
+        try:
+            return float(self.inp.text())
+        except:
+            return 0.0
 
 class DijkstraDialog(BaseDialog):
     def __init__(self):

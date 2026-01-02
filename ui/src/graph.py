@@ -21,42 +21,107 @@ class Graph:
     
     def load_from_csv(self, path):
         import csv
-        import random
         self.nodes = []
         self.edges = []
         
-        def get_or_create(nid):
-            n = self.get_node_by_id(nid)
-            if not n:
-                act = round(random.uniform(0.1, 1.0), 2)
-                inter = random.randint(1, 100)
-                n = Node(nid, f"Node {nid}", act, inter) 
-                self.nodes.append(n)
-            return n
-
-        with open(path, "r", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) < 2: continue
+        # Format: DugumId, Ozellik_I (Aktiflik), Ozellik_II (Etkilesim), Ozellik_III (Baglanti), Komsular
+        # Delimiters can be comma or semicolon usually. We'll try to sniff or just assume standard CSV.
+        
+        nodes_dict = {}
+        
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                # Read all lines to handle potential format issues manually
+                lines = f.readlines()
+                
+            # Skip header if present (check if first char is not digit)
+            start_idx = 0
+            if lines and not lines[0][0].isdigit():
+                start_idx = 1
+                
+            # First pass: Create Nodes
+            for line in lines[start_idx:]:
+                line = line.strip()
+                if not line: continue
+                
+                # Handle potential delimiters
+                parts = line.replace(';', ',').split(',')
+                # Filter empty strings from split (e.g. trailing comma)
+                parts = [p.strip() for p in parts if p.strip()]
+                
+                if len(parts) < 5: continue
+                
                 try:
-                    s_id = int(row[0])
-                    t_id = int(row[1])
-                    w = float(row[2]) if len(row) > 2 else 1.0
+                    nid = int(parts[0])
+                    act = float(parts[1])
+                    inter = int(parts[2])
+                    # parts[3] is listed connection count, but we recalculate it usually or store it.
+                    # We will store it for weight calculation base.
+                    conn_count_val = int(parts[3]) 
                     
-                    n1 = get_or_create(s_id)
-                    n2 = get_or_create(t_id)
+                    # Remaining parts are neighbors
+                    # Some inputs might have neighbors joined by spaces or specific format.
+                    # Standard requirement: "2,4,5"
+                    # But splitting by comma above might have split the neighbors too if they weren't quoted.
+                    # Let's re-parse neighbors carefully.
+                    # If parts were split by comma: [id, act, inter, count, n1, n2, n3...]
+                    neighbors_raw = parts[4:]
+                    neighbors = []
+                    for n_str in neighbors_raw:
+                        if n_str.isdigit():
+                            neighbors.append(int(n_str))
+                            
+                    node = Node(nid, f"Node {nid}", act, inter, conn_count_val, neighbors)
+                    # Note: We pass neighbors to constructor if supported, otherwise attribute
+                    # Node definition in this codebase seemed to take (id, name, act, inter) initially?
+                    # Let's check Node __init__ signature usage in previous code:
+                    # Node(nid, f"Node {nid}", act, inter) -> checking file outline/content helps.
+                    # Looking at line 33 of original file: n = Node(nid, f"Node {nid}", act, inter)
+                    # And line 73: n["komsular"] passed to constructor? 
+                    # Let's be safe and set attributes.
                     
-                    if not self.edge_exists(s_id, t_id):
-                        self.edges.append(Edge(s_id, t_id, w))
-                        
-                        if t_id not in n1.komsular: n1.komsular.append(t_id)
-                        if s_id not in n2.komsular: n2.komsular.append(s_id)
-                        n1.baglanti_sayisi = len(n1.komsular)
-                        n2.baglanti_sayisi = len(n2.komsular)
+                    # The original load_from_json passed 6 args. Let's check Node class definition?
+                    # I'll just assign to .komsular to be safe.
+                    node.komsular = neighbors
+                    
+                    self.nodes.append(node)
+                    nodes_dict[nid] = node
                 except ValueError:
-                    continue 
+                    continue
 
-        self._autosave()
+            # Second pass: Create Edges
+            # We don't want duplicate edges (1-2 and 2-1).
+            added_pairs = set()
+            
+            for node in self.nodes:
+                for neighbor_id in node.komsular:
+                    if neighbor_id not in nodes_dict:
+                        continue
+                        
+                    n1 = node
+                    n2 = nodes_dict[neighbor_id]
+                    
+                    # Sort to check uniqueness
+                    pair = tuple(sorted((n1.id, n2.id)))
+                    if pair in added_pairs:
+                        continue
+                        
+                    if n1.id == n2.id: continue # No self loops
+                    
+                    # Calculate weight
+                    w = self.calculate_weight(n1, n2)
+                    self.edges.append(Edge(n1.id, n2.id, w))
+                    added_pairs.add(pair)
+            
+            # Recalculate connection counts if we want to ensure consistency with loaded edges,
+            # but the requirement says "Use the table". The table had a connection count column.
+            # Using the loaded 'baglanti_sayisi' for the weight formula as per requirement.
+            
+            self._autosave()
+            
+        except Exception as e:
+            print(f"Error loading CSV: {e}")
+
 
    
     def load_from_json(self, path):
@@ -314,7 +379,12 @@ class Graph:
         return result
     
        
-    def connected_components(self):
+    def connected_components(self, threshold=0.0):
+        """
+        Finds connected components.
+        If threshold > 0, edges with weight < threshold are ignored (treated as not connected).
+        This allows for community detection based on strong structural/attribute similarities.
+        """
         visited = set()
         components = []
 
@@ -334,10 +404,22 @@ class Graph:
                 if current_node is None:
                     continue
 
-                for nb in current_node.komsular:
-                    if nb not in visited:
-                        visited.add(nb)
-                        stack.append(nb)
+                for nb_id in current_node.komsular:
+                    # Check if edge satisfies threshold
+                    # We need to find the edge object to get the weight
+                    edge_w = 0
+                    for e in self.edges:
+                        if (e.source == current_id and e.target == nb_id) or \
+                           (e.source == nb_id and e.target == current_id):
+                            edge_w = e.weight
+                            break
+                    
+                    if edge_w < threshold:
+                        continue
+
+                    if nb_id not in visited:
+                        visited.add(nb_id)
+                        stack.append(nb_id)
 
             components.append(comp)
 
@@ -454,7 +536,7 @@ class Graph:
         raise ValueError("Bu iki node arasında yol yok")
     
     
-    def welsh_powell(self):
+    def welsh_powell(self, threshold=0.0):
         sorted_nodes = sorted(
             self.nodes,
             key=lambda n: n.baglanti_sayisi,
@@ -476,9 +558,21 @@ class Graph:
 
                 conflict = False
                 for komsu in other.komsular:
+                    # Check if neighbor has current color
                     if color_of.get(komsu) == current_color:
-                        conflict = True
-                        break
+                        # Check if the edge is 'active' based on threshold
+                        # We need to verify weight.
+                        w = 0
+                        # Optimization: We could pre-index edges, but for N=100 iteration is fine.
+                        for e in self.edges:
+                             if (e.source == other.id and e.target == komsu) or \
+                                (e.source == komsu and e.target == other.id):
+                                 w = e.weight
+                                 break
+                        
+                        if w >= threshold:
+                            conflict = True
+                            break
 
                 if not conflict:
                     color_of[other.id] = current_color
