@@ -1,4 +1,4 @@
-@ -0,0 +1,254 @@
+
 # YAZLAB2 - Sosyal Ağ Analizi ve Görselleştirme Aracı
 
 ## 1. Proje Bilgileri
@@ -6,7 +6,7 @@
 **Ekip Üyeleri:**
 *   Ebubekir Yılmaz - 231307044
 *   Mehmet Biçer - 241307111
-*   Tarih: 02.01.2026
+*   Tarih: 2026
 
 
 ---
