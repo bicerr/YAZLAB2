@@ -1,7 +1,5 @@
 
-# ==========================================
-# COLOR PALETTE (Sosialex - Midnight Blue)
-# ==========================================
+
 COLORS = {
     "background": "#0b1622",      # Deep Midnight
     "panel": "#111f2e",           # Panel Background
@@ -12,14 +10,12 @@ COLORS = {
     "accent_blue": "#0ea5e9",     # Sky Blue (Icons/Highlights)
     "accent_cyan": "#06b6d4",     # Cyan
     "accent_green": "#10b981",    # Success
-    "glass_bg": "rgba(255, 255, 255, 0.03)", # Glass effect
+    "glass_bg": "rgba(255, 255, 255, 0.03)", 
     "glass_border": "rgba(255, 255, 255, 0.08)",
     "input_bg": "#0f2336"
 }
 
-# ==========================================
-# STYLESHEETS (QSS)
-# ==========================================
+
 
 MAIN_APP_STYLE = f"""
     QMainWindow {{
