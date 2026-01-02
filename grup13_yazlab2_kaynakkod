@@ -1,0 +1,3312 @@
+------------- __init__.py ------------
+
+def __init__(self, data_path=None, autosave=True):
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    self.data_path = data_path or os.path.join(base_dir, "data", "graph.json")
+    self.autosave = autosave
+    self.nodes = []
+    self.edges = []
+
+
+------------- dashboard.py --------------
+
+
+import math
+
+from PyQt5.QtWidgets import (
+    QDialog, QWidget, QVBoxLayout, QHBoxLayout, 
+    QLabel, QFrame, QTableWidget, QTableWidgetItem, QHeaderView, QGridLayout,
+    QPushButton
+)
+from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPen, QLinearGradient
+from PyQt5.QtCore import Qt, QSize
+
+from ui.src.styles import COLORS, PANEL_STYLE, TABLE_STYLE
+
+
+class MetricCard(QFrame):
+    def __init__(self, title, value, subtext="", color=COLORS["accent_blue"]):
+        super().__init__()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['panel']};
+                border: 1px solid {COLORS['glass_border']};
+                border-radius: 8px;
+            }}
+        """)
+        self.layout_main = QVBoxLayout(self)
+        
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet("color: #64748b; font-size: 13px; font-weight: bold; border: none;")
+        self.layout_main.addWidget(lbl_title)
+        
+        lbl_val = QLabel(str(value))
+        lbl_val.setStyleSheet(f"color: {color}; font-size: 32px; font-weight: bold; border: none;")
+        self.layout_main.addWidget(lbl_val)
+        
+        if subtext:
+             lbl_sub = QLabel(subtext)
+             lbl_sub.setStyleSheet("color: #94a3b8; font-size: 11px; border: none;")
+             self.layout_main.addWidget(lbl_sub)
+             
+class SimpleBarChart(QWidget):
+    def __init__(self, data, color=COLORS["accent_blue"]):
+        """
+        data: list of tuples (label, value)
+        """
+        super().__init__()
+        self.data = data
+        self.bar_color = QColor(color)
+        self.setMinimumHeight(200)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        w = self.width()
+        h = self.height()
+        
+        if not self.data:
+            painter.setPen(Qt.white)
+            painter.drawText(self.rect(), Qt.AlignCenter, "Veri Yok")
+            return
+
+        max_val = max([x[1] for x in self.data]) if self.data else 1
+        if max_val == 0: max_val = 1
+        
+        bar_width = w / (len(self.data) * 1.5)
+        spacing = bar_width / 2.0
+        
+        current_x = spacing
+        
+        font = QFont("Arial", 9)
+        painter.setFont(font)
+        
+        for label, val in self.data:
+            bar_h = (val / max_val) * (h - 40)
+            
+            real_h = int(bar_h) if int(bar_h) > 0 else 1
+            rect_x = int(current_x)
+            rect_y = int(h - 20 - bar_h)
+            
+            gradient = QLinearGradient(0, rect_y, 0, rect_y + real_h)
+            gradient.setColorAt(0, self.bar_color.lighter(130)) # Lighter top
+            gradient.setColorAt(1, self.bar_color.darker(110))  # Darker bottom
+            
+            painter.setBrush(QBrush(gradient))
+            painter.setPen(Qt.NoPen)
+            
+            
+            
+            painter.drawRoundedRect(int(rect_x), int(rect_y), int(bar_width), int(bar_h), 4, 4)
+            
+            painter.setPen(QPen(QColor(COLORS["text_muted"])))
+            
+            
+            painter.drawText(int(rect_x), int(h - 18), int(bar_width), 15, Qt.AlignCenter, str(label))
+            
+            painter.setPen(QPen(Qt.white))
+            painter.drawText(int(rect_x), int(rect_y - 18), int(bar_width), 15, Qt.AlignCenter, str(val))
+            
+            current_x += bar_width + spacing
+
+class SimpleGauge(QWidget):
+    def __init__(self, value, max_value=1.0, title=""):
+        super().__init__()
+        self.value = value
+        self.max_value = max_value if max_value > 0 else 1
+        self.title = title
+        self.setMinimumHeight(150)
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        w = self.width()
+        h = self.height()
+        
+        size = min(w, h) - 40
+        x = (w - size) / 2
+        y = (h - size) / 2 + 10
+        
+        pen_bg = QPen(QColor("#1e293b"), 12, Qt.SolidLine, Qt.RoundCap)
+        painter.setPen(pen_bg)
+        painter.drawArc(int(x), int(y), int(size), int(size), 180 * 16, -180 * 16)
+        
+        ratio = self.value / self.max_value
+        span = int(-180 * ratio * 16)
+        
+        pen_val = QPen(QColor(COLORS["accent_green"]), 12, Qt.SolidLine, Qt.RoundCap)
+        painter.setPen(pen_val)
+        painter.drawArc(int(x), int(y), int(size), int(size), 180 * 16, span)
+        
+        painter.setPen(Qt.white)
+        font = QFont("Arial", 20, QFont.Bold)
+        painter.setFont(font)
+        txt = f"{self.value:.2f}"
+        painter.drawText(self.rect(), Qt.AlignCenter, txt)
+        
+        painter.setPen(QColor(COLORS["text_muted"]))
+        font2 = QFont("Arial", 10)
+        painter.setFont(font2)
+        painter.drawText(int(x), int(y + size/2 + 20), int(size), 20, Qt.AlignCenter, self.title)
+
+from PyQt5.QtCore import pyqtSignal
+
+class DashboardWidget(QWidget):
+    back_clicked = pyqtSignal()
+
+    def __init__(self, graph):
+        super().__init__()
+        self.graph = graph
+        
+        layout_main = QVBoxLayout(self)
+        layout_main.setContentsMargins(20, 20, 20, 20)
+        layout_main.setSpacing(20)
+        
+        header_layout = QHBoxLayout()
+        
+        btn_back = QPushButton("<< Geri Dön")
+        btn_back.setStyleSheet(f"background-color: {COLORS['input_bg']}; color: {COLORS['text']}; border: 1px solid {COLORS['border']}; padding: 8px 15px; border-radius: 4px;")
+        btn_back.setCursor(Qt.PointingHandCursor)
+        btn_back.clicked.connect(self.emit_back)
+        header_layout.addWidget(btn_back)
+        
+        lbl_header = QLabel("İstatistik ve Metrik Panosu")
+        lbl_header.setStyleSheet(f"color: {COLORS['text']}; font-size: 22px; font-weight: bold; margin-left: 10px;")
+        header_layout.addWidget(lbl_header)
+        
+        header_layout.addStretch()
+        layout_main.addLayout(header_layout)
+        
+        row1 = QHBoxLayout()
+        row1.setSpacing(15)
+        
+        node_count = len(graph.nodes)
+        edge_count = len(graph.edges)
+        
+        density = 0
+        if node_count > 1:
+            density = (2 * edge_count) / (node_count * (node_count - 1))
+            
+        panel_deg = QFrame()
+        panel_deg.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
+        l_deg = QVBoxLayout(panel_deg)
+        l_deg.addWidget(QLabel("Derece Merkeziliği (İlk 10)"))
+        
+        top_deg = sorted(graph.nodes, key=lambda n: n.baglanti_sayisi, reverse=True)[:10]
+        data_deg = [(str(n.id), n.baglanti_sayisi) for n in top_deg]
+        
+        chart_deg = SimpleBarChart(data_deg, color="#3b82f6")
+        l_deg.addWidget(chart_deg)
+        row1.addWidget(panel_deg, stretch=2)
+        
+        
+        panel_mid = QFrame()
+        panel_mid.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
+        l_mid = QVBoxLayout(panel_mid)
+        l_mid.addWidget(QLabel("Ağ Yoğunluğu (Density)"))
+        
+        gauge_density = SimpleGauge(density, 1.0, "Yoğunluk Skoru")
+        l_mid.addWidget(gauge_density)
+        row1.addWidget(panel_mid, stretch=1)
+        
+        panel_right = QFrame()
+        panel_right.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
+        l_right = QVBoxLayout(panel_right)
+        l_right.addWidget(QLabel("Genel Özet"))
+        
+        l_right.addWidget(MetricCard("Toplam Düğüm", node_count, "Aktör Sayısı"))
+        l_right.addWidget(MetricCard("Toplam Bağlantı", edge_count, "İlişki Sayısı"))
+        
+        row1.addWidget(panel_right, stretch=1)
+        
+        layout_main.addLayout(row1, stretch=4)
+        
+        row2 = QHBoxLayout()
+        row2.setSpacing(15)
+        
+        panel_table = QFrame()
+        panel_table.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
+        l_tbl = QVBoxLayout(panel_table)
+        lbl_tbl = QLabel("En Etkili Aktörler Listesi")
+        lbl_tbl.setStyleSheet("font-size: 14px; font-weight: bold; margin-bottom: 5px;")
+        l_tbl.addWidget(lbl_tbl)
+        
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(["ID", "İsim", "Derece", "Aktiflik"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setStyleSheet(TABLE_STYLE)
+        
+        table.setRowCount(len(top_deg))
+        for i, n in enumerate(top_deg):
+            table.setItem(i, 0, QTableWidgetItem(str(n.id)))
+            table.setItem(i, 1, QTableWidgetItem(n.name))
+            table.setItem(i, 2, QTableWidgetItem(str(n.baglanti_sayisi)))
+            table.setItem(i, 3, QTableWidgetItem(str(n.aktiflik)))
+            
+        l_tbl.addWidget(table)
+        row2.addWidget(panel_table, stretch=2)
+        
+        panel_closeness = QFrame()
+        panel_closeness.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
+        l_close = QVBoxLayout(panel_closeness)
+        l_close.addWidget(QLabel("Yakınlık Merkeziliği (İlk 5)"))
+        
+        data_close = []
+        for n in top_deg[:5]:
+            try:
+                path, dists = image_dijkstra_all(graph, n.id) 
+                total_dist = sum(dists.values())
+                if total_dist > 0:
+                    val = (node_count - 1) / total_dist
+                else:
+                     val = 0
+                data_close.append((str(n.id), round(val, 4)))
+            except:
+                data_close.append((str(n.id), 0))
+        
+        chart_close = SimpleBarChart(data_close, color="#f59e0b")
+        l_close.addWidget(chart_close)
+        
+        row2.addWidget(panel_closeness, stretch=1)
+        
+        layout_main.addLayout(row2, stretch=3)
+
+    def emit_back(self):
+        self.back_clicked.emit()
+
+def image_dijkstra_all(graph, start_id):
+    import heapq
+    distances = {node.id: float("inf") for node in graph.nodes}
+    distances[start_id] = 0
+    pq = [(0, start_id)]
+    
+    while pq:
+        d, u = heapq.heappop(pq)
+        if d > distances[u]: continue
+        
+        u_node = graph.get_node_by_id(u)
+        if not u_node: continue
+        
+        for v in u_node.komsular:
+            v_node = graph.get_node_by_id(v)
+            weight = graph.calculate_weight(u_node, v_node)
+            cost = 1.0 / weight if weight > 0 else float('inf')
+            
+            if distances[u] + cost < distances[v]:
+                distances[v] = distances[u] + cost
+                heapq.heappush(pq, (distances[v], v))
+                
+    reachable = {k: v for k, v in distances.items() if v != float("inf")}
+    return None, reachable
+
+
+---------------- edge.py -------------------
+
+class Edge:
+    def __init__(self, source, target, weight=1.0):
+        if source == target:
+            raise ValueError("Self-loop (aynı node'a edge) yasaktır.")
+
+        self.source = source
+        self.target = target
+        self.weight = weight
+
+    
+    def to_dict(self):
+        return {
+            "from": self.source,
+            "to": self.target,
+            "weight": self.weight
+        }
+
+    @staticmethod
+    def from_dict(data):
+        return Edge(
+            source=data["from"],
+            target=data["to"],
+            weight=data.get("weight", 1.0)
+        )
+
+    
+    def matches(self, u, v):
+        return (
+            (self.source == u and self.target == v) or
+            (self.source == v and self.target == u)
+        )
+
+    def __repr__(self):
+        return (
+            f"Edge({self.source} <-> {self.target}, "
+            f"weight={self.weight:.4f})"
+        )
+
+
+
+
+------------------ graph.py ------------------
+
+import json
+import os
+from collections import deque
+
+from .node import Node
+from .edge import Edge
+
+
+class Graph:
+    def __init__(self, data_path=None, autosave=False):
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        self.data_path = data_path or os.path.join(base_dir, "data", "graph.json")
+        self.autosave = autosave
+
+        self.nodes = []
+        self.edges = []
+
+        if os.path.exists(self.data_path):
+            self.load_from_json(self.data_path)
+
+    
+    def load_from_csv(self, path):
+        import csv
+        self.nodes = []
+        self.edges = []
+        
+        
+        nodes_dict = {}
+        
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                
+            start_idx = 0
+            if lines and not lines[0][0].isdigit():
+                start_idx = 1
+                
+            for line in lines[start_idx:]:
+                line = line.strip()
+                if not line: continue
+                
+                parts = line.replace(';', ',').split(',')
+                parts = [p.strip() for p in parts if p.strip()]
+                
+                if len(parts) < 5: continue
+                
+                try:
+                    nid = int(parts[0])
+                    act = float(parts[1])
+                    inter = int(parts[2])
+                    conn_count_val = int(parts[3]) 
+                    
+                    
+                    neighbors_raw = parts[4:]
+                    neighbors = []
+                    for n_str in neighbors_raw:
+                        if n_str.isdigit():
+                            neighbors.append(int(n_str))
+                            
+                    node = Node(nid, f"Node {nid}", act, inter, conn_count_val, neighbors)
+                    
+                    node.komsular = neighbors
+                    
+                    self.nodes.append(node)
+                    nodes_dict[nid] = node
+                except ValueError:
+                    continue
+
+            added_pairs = set()
+            
+            for node in self.nodes:
+                for neighbor_id in node.komsular:
+                    if neighbor_id not in nodes_dict:
+                        continue
+                        
+                    n1 = node
+                    n2 = nodes_dict[neighbor_id]
+                    
+                    pair = tuple(sorted((n1.id, n2.id)))
+                    if pair in added_pairs:
+                        continue
+                        
+                    if n1.id == n2.id: continue 
+                    
+                    w = self.calculate_weight(n1, n2)
+                    self.edges.append(Edge(n1.id, n2.id, w))
+                    added_pairs.add(pair)
+            
+            
+            self._autosave()
+            
+        except Exception as e:
+            print(f"Error loading CSV: {e}")
+
+
+   
+    def load_from_json(self, path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.nodes = [
+            Node(
+                n["id"],
+                n["name"],
+                n["aktiflik"],
+                n["etkilesim"],
+                n["baglanti_sayisi"],
+                n["komsular"]
+            )
+            for n in data.get("nodes", [])
+        ]
+
+        self.edges = [
+            Edge(e["from"], e["to"], e["weight"])
+            for e in data.get("edges", [])
+        ]
+
+    def save_to_json(self, path):
+        data = {
+            "nodes": [
+                {
+                    "id": n.id,
+                    "name": n.name,
+                    "aktiflik": n.aktiflik,
+                    "etkilesim": n.etkilesim,
+                    "baglanti_sayisi": n.baglanti_sayisi,
+                    "komsular": n.komsular
+                }
+                for n in self.nodes
+            ],
+            "edges": [
+                {
+                    "from": e.source,
+                    "to": e.target,
+                    "weight": e.weight
+                }
+                for e in self.edges
+            ]
+        }
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    def export_adjacency_matrix(self, path):
+        sorted_nodes = sorted(self.nodes, key=lambda n: n.id)
+        node_ids = [n.id for n in sorted_nodes]
+        n_count = len(node_ids)
+        
+        
+        matrix = []
+        header = [""] + [str(nid) for nid in node_ids]
+        matrix.append(header)
+        
+        for i, r_node in enumerate(sorted_nodes):
+            row = [str(r_node.id)]
+            for c_node in sorted_nodes:
+                val = "0"
+                if self.edge_exists(r_node.id, c_node.id):
+                   val = "1"
+                row.append(val)
+            matrix.append(row)
+            
+        import csv
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(matrix)
+
+    def _autosave(self):
+        if self.autosave and self.data_path:
+            self.save_to_json(self.data_path)
+
+    
+    def get_node_by_id(self, node_id):
+        for node in self.nodes:
+            if node.id == node_id:
+                return node
+        return None
+
+    def add_node(self, node: Node):
+        if self.get_node_by_id(node.id) is not None:
+            raise ValueError(f"Aynı ID'ye sahip node zaten var: {node.id}")
+
+        self.nodes.append(node)
+        self._autosave()
+
+    def update_node(self, node_id, name=None, aktiflik=None, etkilesim=None):
+        node = self.get_node_by_id(node_id)
+        if node is None:
+            raise ValueError("Node bulunamadı")
+
+        if name is not None:
+            node.name = name
+        if aktiflik is not None:
+            node.aktiflik = float(aktiflik)
+        if etkilesim is not None:
+            node.etkilesim = int(etkilesim)
+
+ 
+        node.baglanti_sayisi = len(node.komsular)
+
+        for e in self.edges:
+            if e.source == node_id or e.target == node_id:
+                n1 = self.get_node_by_id(e.source)
+                n2 = self.get_node_by_id(e.target)
+                e.weight = self.calculate_weight(n1, n2)
+
+        self._autosave()    
+
+    def remove_node(self, node_id):
+        node = self.get_node_by_id(node_id)
+        if node is None:
+            raise ValueError("Node bulunamadı")
+
+        self.nodes = [n for n in self.nodes if n.id != node_id]
+
+        self.edges = [
+            e for e in self.edges
+            if e.source != node_id and e.target != node_id
+        ]
+
+        for n in self.nodes:
+            if node_id in n.komsular:
+                n.komsular.remove(node_id)
+
+        self._autosave()
+
+    
+    def calculate_weight(self, node1: Node, node2: Node):
+        return 1 / (
+            1
+            + (node1.aktiflik - node2.aktiflik) ** 2
+            + (node1.etkilesim - node2.etkilesim) ** 2
+            + (node1.baglanti_sayisi - node2.baglanti_sayisi) ** 2
+        )
+
+    
+    def edge_exists(self, source_id, target_id):
+        for e in self.edges:
+            if (e.source == source_id and e.target == target_id) or \
+               (e.source == target_id and e.target == source_id):
+                return True
+        return False
+
+    def add_edge(self, source_id, target_id):
+        if source_id == target_id:
+            raise ValueError("Self-loop yasak")
+
+        node1 = self.get_node_by_id(source_id)
+        node2 = self.get_node_by_id(target_id)
+
+        if node1 is None or node2 is None:
+            raise ValueError("Node bulunamadı")
+
+        if self.edge_exists(source_id, target_id):
+            raise ValueError("Bu edge zaten var")
+
+        weight = self.calculate_weight(node1, node2)
+        self.edges.append(Edge(source_id, target_id, weight))
+
+        if target_id not in node1.komsular:
+            node1.komsular.append(target_id)
+        if source_id not in node2.komsular:
+            node2.komsular.append(source_id)
+
+        node1.baglanti_sayisi = len(node1.komsular)
+        node2.baglanti_sayisi = len(node2.komsular)
+
+        self._autosave()
+        
+    def remove_edge(self, source_id, target_id):
+        removed = False
+        new_edges = []
+
+        for e in self.edges:
+            if (e.source == source_id and e.target == target_id) or (e.source == target_id and e.target == source_id):
+                removed = True
+            else:
+                new_edges.append(e)
+
+        if not removed:
+            raise ValueError("Edge bulunamadı")
+
+        self.edges = new_edges
+
+        n1 = self.get_node_by_id(source_id)
+        n2 = self.get_node_by_id(target_id)
+
+        if n1 and target_id in n1.komsular:
+            n1.komsular.remove(target_id)
+            n1.baglanti_sayisi = len(n1.komsular)
+
+        if n2 and source_id in n2.komsular:
+            n2.komsular.remove(source_id)
+            n2.baglanti_sayisi = len(n2.komsular)
+
+        self._autosave()
+
+
+
+        
+
+    
+    def bfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        queue = deque()
+        result = []
+
+        queue.append(start_node_id)
+        visited.add(start_node_id)
+
+        while queue:
+            current_id = queue.popleft()
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    visited.add(komsu_id)
+                    queue.append(komsu_id)
+
+        print("BFS sonucu:", result)
+        return result
+
+    
+    def dfs(self, start_node_id):
+        start_node = self.get_node_by_id(start_node_id)
+        if start_node is None:
+            raise ValueError("Başlangıç node'u bulunamadı")
+
+        visited = set()
+        result = []
+
+        def _dfs(current_id):
+            visited.add(current_id)
+            result.append(current_id)
+
+            current_node = self.get_node_by_id(current_id)
+            for komsu_id in current_node.komsular:
+                if komsu_id not in visited:
+                    _dfs(komsu_id)
+
+        _dfs(start_node_id)
+
+        print("DFS sonucu:", result)
+        return result
+    
+       
+    def connected_components(self, threshold=0.0):
+        """
+        Finds connected components.
+        If threshold > 0, edges with weight < threshold are ignored (treated as not connected).
+        This allows for community detection based on strong structural/attribute similarities.
+        """
+        visited = set()
+        components = []
+
+        for node in self.nodes:
+            if node.id in visited:
+                continue
+
+            comp = []
+            stack = [node.id]
+            visited.add(node.id)
+
+            while stack:
+                current_id = stack.pop()
+                comp.append(current_id)
+
+                current_node = self.get_node_by_id(current_id)
+                if current_node is None:
+                    continue
+
+                for nb_id in current_node.komsular:
+                    edge_w = 0
+                    for e in self.edges:
+                        if (e.source == current_id and e.target == nb_id) or \
+                           (e.source == nb_id and e.target == current_id):
+                            edge_w = e.weight
+                            break
+                    
+                    if edge_w < threshold:
+                        continue
+
+                    if nb_id not in visited:
+                        visited.add(nb_id)
+                        stack.append(nb_id)
+
+            components.append(comp)
+
+        return components
+
+
+               
+    def degree_centrality_top5(self):
+        degrees = [(n.id, len(n.komsular)) for n in self.nodes]
+
+        degrees.sort(key=lambda x: x[1], reverse=True)
+
+        return degrees[:5]
+
+    
+    def dijkstra(self, start_id, end_id):
+        if self.get_node_by_id(start_id) is None or self.get_node_by_id(end_id) is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        
+        distances = {node.id: float("inf") for node in self.nodes}
+        previous = {node.id: None for node in self.nodes}
+
+        distances[start_id] = 0
+        unvisited = set(distances.keys())
+
+        while unvisited:
+            current = min(unvisited, key=lambda node_id: distances[node_id])
+            unvisited.remove(current)
+
+            if current == end_id:
+                break
+
+            current_node = self.get_node_by_id(current)
+            for neighbor_id in current_node.komsular:
+                if neighbor_id not in unvisited:
+                    continue
+
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                weight_val = self.calculate_weight(current_node, neighbor_node)
+                cost = 1.0 / weight_val if weight_val > 0 else float('inf')
+                
+                new_dist = distances[current] + cost
+
+                if new_dist < distances[neighbor_id]:
+                    distances[neighbor_id] = new_dist
+                    previous[neighbor_id] = current
+
+        path = []
+        current = end_id
+        while current is not None:
+            path.insert(0, current)
+            current = previous[current]
+
+        if path[0] != start_id:
+            raise ValueError("Bu iki node arasında yol yok")
+
+        return path, distances[end_id]
+    
+       
+    def heuristic(self, node1: Node, node2: Node):
+        
+        return (
+            abs(node1.aktiflik - node2.aktiflik)
+            + abs(node1.etkilesim - node2.etkilesim)
+            + abs(node1.baglanti_sayisi - node2.baglanti_sayisi)
+        )
+
+    def astar(self, start_id, end_id):
+        start_node = self.get_node_by_id(start_id)
+        end_node = self.get_node_by_id(end_id)
+
+        if start_node is None or end_node is None:
+            raise ValueError("Başlangıç veya hedef node bulunamadı")
+
+        open_set = {start_id}
+        came_from = {}
+
+        g_score = {node.id: float("inf") for node in self.nodes}
+        f_score = {node.id: float("inf") for node in self.nodes}
+
+        g_score[start_id] = 0
+        f_score[start_id] = self.heuristic(start_node, end_node)
+
+        while open_set:
+            current = min(open_set, key=lambda nid: f_score[nid])
+
+            if current == end_id:
+                path = [current]
+                while current in came_from:
+                    current = came_from[current]
+                    path.insert(0, current)
+                return path, g_score[end_id]
+
+            open_set.remove(current)
+            current_node = self.get_node_by_id(current)
+
+            for neighbor_id in current_node.komsular:
+                neighbor_node = self.get_node_by_id(neighbor_id)
+                
+                weight_val = self.calculate_weight(current_node, neighbor_node)
+                cost = 1.0 / weight_val if weight_val > 0 else float('inf')
+                
+                tentative_g = g_score[current] + cost
+
+                if tentative_g < g_score[neighbor_id]:
+                    came_from[neighbor_id] = current
+                    g_score[neighbor_id] = tentative_g
+                    f_score[neighbor_id] = tentative_g + self.heuristic(
+                        neighbor_node, end_node
+                    )
+                    open_set.add(neighbor_id)
+
+        raise ValueError("Bu iki node arasında yol yok")
+    
+    
+    def welsh_powell(self, threshold=0.0):
+        sorted_nodes = sorted(
+            self.nodes,
+            key=lambda n: n.baglanti_sayisi,
+            reverse=True
+        )
+
+        color_of = {}   
+        current_color = 0
+
+        for node in sorted_nodes:
+            if node.id in color_of:
+                continue
+
+            color_of[node.id] = current_color
+
+            for other in sorted_nodes:
+                if other.id in color_of:
+                    continue
+
+                conflict = False
+                for komsu in other.komsular:
+                    if color_of.get(komsu) == current_color:
+                        w = 0
+                        for e in self.edges:
+                             if (e.source == other.id and e.target == komsu) or \
+                                (e.source == komsu and e.target == other.id):
+                                 w = e.weight
+                                 break
+                        
+                        if w >= threshold:
+                            conflict = True
+                            break
+
+                if not conflict:
+                    color_of[other.id] = current_color
+
+            current_color += 1
+
+        return color_of
+
+   
+    def spring_layout(self, width=1200, height=800, iterations=50):
+        """
+        Basit bir yay-kütle (Spring-Force) yerleşim algoritması.
+        """
+        import random
+        import math
+        
+        nodes = self.nodes
+        n = len(nodes)
+        if n == 0: return {}
+        if n == 1: return {nodes[0].id: (width/2, height/2)}
+
+        positions = {node.id: [random.uniform(100, width-100), random.uniform(100, height-100)] for node in nodes}
+        
+        area = width * height
+        k = math.sqrt(area / n)
+        
+        t = width / 10 
+        dt = t / (iterations + 1)
+
+        for i in range(iterations):
+            disp = {node.id: [0.0, 0.0] for node in nodes}
+
+            
+            for v_node in nodes:
+                v = v_node.id
+                v_pos = positions[v]
+                for u_node in nodes:
+                    u = u_node.id
+                    if u == v: continue
+                    
+                    u_pos = positions[u]
+                    
+                    delta_x = v_pos[0] - u_pos[0]
+                    delta_y = v_pos[1] - u_pos[1]
+                    dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
+                    
+                    force = (k * k) / dist
+                    disp[v][0] += (delta_x / dist) * force
+                    disp[v][1] += (delta_y / dist) * force
+
+            for edge in self.edges:
+                v = edge.source
+                u = edge.target
+                if v not in positions or u not in positions: continue
+                
+                v_pos = positions[v]
+                u_pos = positions[u]
+                
+                delta_x = v_pos[0] - u_pos[0]
+                delta_y = v_pos[1] - u_pos[1]
+                dist = math.sqrt(delta_x*delta_x + delta_y*delta_y) or 0.01
+                
+                force = (dist * dist) / k
+                
+                disp[v][0] -= (delta_x / dist) * force
+                disp[v][1] -= (delta_y / dist) * force
+                
+                disp[u][0] += (delta_x / dist) * force
+                disp[u][1] += (delta_y / dist) * force
+
+            for node in nodes:
+                v = node.id
+                d_len = math.sqrt(disp[v][0]**2 + disp[v][1]**2) or 0.01
+                
+                step = min(d_len, t)
+                
+                positions[v][0] += (disp[v][0] / d_len) * step
+                positions[v][1] += (disp[v][1] / d_len) * step
+                
+                positions[v][0] = min(width-50, max(50, positions[v][0]))
+                positions[v][1] = min(height-50, max(50, positions[v][1]))
+
+            t -= dt
+
+        return {nid: (pos[0], pos[1]) for nid, pos in positions.items()}
+
+
+
+
+
+-------------------- main.py ----------------------
+
+
+import sys
+import os
+import math
+
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, 
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QDialog, 
+    QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsLineItem,
+    QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
+    QSizePolicy, QGraphicsTextItem, QScrollArea, QGraphicsItem, QComboBox, QFileDialog,
+    QStackedWidget
+)
+from PyQt5.QtGui import QBrush, QPen, QPainter, QColor, QFont, QRadialGradient
+from PyQt5.QtCore import Qt, QPointF, pyqtSignal
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from ui.src.graph import Graph
+from ui.src.node import Node
+from ui.src.edge import Edge
+from ui.src.styles import (
+    COLORS, MAIN_APP_STYLE, HEADER_STYLE, PANEL_STYLE, 
+    BUTTON_STYLE, INPUT_STYLE, TABLE_STYLE
+)
+from ui.src.dashboard import DashboardWidget
+
+
+class Panel(QFrame):
+    def __init__(self, title=None):
+        super().__init__()
+        self.setObjectName("Panel")
+        self.setStyleSheet(PANEL_STYLE)
+        
+        self.layout_main = QVBoxLayout(self)
+        self.layout_main.setContentsMargins(10, 10, 10, 10)
+        self.layout_main.setSpacing(10)
+        
+        if title:
+            lbl = QLabel(title)
+            lbl.setObjectName("PanelTitle")
+            self.layout_main.addWidget(lbl)
+
+    def add_widget(self, widget):
+        self.layout_main.addWidget(widget)
+        
+    def add_layout(self, layout):
+        self.layout_main.addLayout(layout)
+
+class GlossyButton(QPushButton):
+    def __init__(self, text):
+        super().__init__(text)
+        self.setStyleSheet(BUTTON_STYLE)
+        self.setCursor(Qt.PointingHandCursor)
+
+
+class NodeItem(QGraphicsEllipseItem):
+    def __init__(self, node, x, y, r=22, color="#4cc9f0"):
+        super().__init__(0, 0, 2*r, 2*r)
+        self.node = node
+        self.setPos(x - r, y - r)
+        
+        c = QColor(color)
+        grad = QRadialGradient(r, r, r)
+        grad.setColorAt(0, c.lighter(130))
+        grad.setColorAt(1, c)
+        
+        self.setBrush(QBrush(grad))
+        self.setPen(QPen(Qt.white, 2))
+        
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setAcceptHoverEvents(True)
+        
+        
+        label = QGraphicsTextItem(str(node.id), self)
+        label.setDefaultTextColor(Qt.white)
+        font = QFont("Segoe UI", 10, QFont.Bold)
+        label.setFont(font)
+        rect = label.boundingRect()
+        label.setPos(r - rect.width()/2, r - rect.height()/2)
+
+    def hoverEnterEvent(self, event):
+        self.setPen(QPen(QColor(COLORS["accent_cyan"]), 4))
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        if not self.isSelected():
+            self.setPen(QPen(Qt.white, 2))
+        super().hoverLeaveEvent(event)
+        
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedChange:
+            if value:
+                self.setPen(QPen(QColor(COLORS["accent_blue"]), 4))
+            else:
+                self.setPen(QPen(Qt.white, 2))
+        return super().itemChange(change, value)
+
+class EdgeItem(QGraphicsLineItem):
+    def __init__(self, edge, p1: QPointF, p2: QPointF, color=None):
+        super().__init__(p1.x(), p1.y(), p2.x(), p2.y())
+        self.setZValue(-1)
+        w = max(1, min(6, edge.weight * 3))
+        
+        c = color if color else COLORS["text_muted"]
+        pen = QPen(QColor(c), w)
+        pen.setCapStyle(Qt.RoundCap)
+        self.setPen(pen)
+        
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(f"Edge: {edge.source}-{edge.target}\nAğırlık: {edge.weight:.4f}")
+
+        mid_x = (p1.x() + p2.x()) / 2
+        mid_y = (p1.y() + p2.y()) / 2
+        
+        self.text = QGraphicsTextItem(f"{edge.weight:.2f}", self)
+        rect = self.text.boundingRect()
+        self.text.setPos(mid_x - rect.width()/2, mid_y - rect.height()/2)
+        
+        self.text.setDefaultTextColor(QColor("#a5b4fc")) # Light Indigo
+        font = QFont("Arial", 9)
+        self.text.setFont(font)
+        
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Sosyal Ağ Analiz Uygulaması")
+        self.resize(1450, 900)
+        
+        self.graph = Graph()
+        self.is_colored = False
+        self.community_threshold = 0.0  
+        
+        self.highlight_nodes = set()
+        self.highlight_edges = set() 
+        
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
+        
+        self.page_editor = QWidget()
+        self.stack.addWidget(self.page_editor)
+        
+        main_layout = QVBoxLayout(self.page_editor)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        self.create_header(main_layout)
+        
+        body_layout = QHBoxLayout()
+        body_layout.setContentsMargins(10, 10, 10, 10)
+        body_layout.setSpacing(10)
+        main_layout.addLayout(body_layout)
+        
+        self.create_left_col(body_layout)
+        
+        self.create_center_col(body_layout)
+        
+        self.create_right_col(body_layout)
+        
+       
+        self.page_dashboard_container = QWidget()
+        self.stack.addWidget(self.page_dashboard_container)
+        dash_layout = QVBoxLayout(self.page_dashboard_container)
+        dash_layout.setContentsMargins(0,0,0,0)
+        
+        self.draw_graph()
+
+    def create_header(self, parent_layout):
+        header = QFrame()
+        header.setObjectName("Header")
+        header.setStyleSheet(HEADER_STYLE)
+        header.setFixedHeight(60)
+        
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(20, 0, 20, 0)
+        
+        hl.addStretch() 
+        title = QLabel("Sosyal Ağ Analiz Uygulaması")
+        title.setObjectName("AppTitle")
+        title.setAlignment(Qt.AlignCenter)
+        hl.addWidget(title)
+        hl.addStretch() 
+        
+        sys_icons = QLabel("🎥 🎤 ⚙️ ★")
+        sys_icons.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 16px;")
+        hl.addWidget(sys_icons)
+        
+        parent_layout.addWidget(header)
+
+    def create_left_col(self, parent_layout):
+        container = QWidget()
+        container.setFixedWidth(260)
+        l = QVBoxLayout(container)
+        l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(10)
+        
+        p1 = Panel("Graf İşlemleri")
+        
+        b1 = GlossyButton("+ Node Ekle")
+        b1.clicked.connect(self.open_add_node)
+        p1.add_widget(b1)
+        
+        b2 = GlossyButton("- Node Sil")
+        b2.clicked.connect(self.open_delete_node)
+        p1.add_widget(b2)
+        
+        b3 = GlossyButton("+ Edge Ekle")
+        b3.clicked.connect(self.open_add_edge)
+        p1.add_widget(b3)
+        
+        b4 = GlossyButton("- Edge Sil")
+        b4.clicked.connect(self.open_delete_edge)
+        p1.add_widget(b4)
+        
+        l.addWidget(p1)
+        
+        p2 = Panel("Veri Aktarımı")
+        b_save = GlossyButton("💾 Kaydet (JSON)")
+        b_save.clicked.connect(self.save_graph)
+        p2.add_widget(b_save)
+
+        b_revert = GlossyButton("<< Geri Al (Son Kayıt)")
+        b_revert.clicked.connect(self.revert_graph)
+        p2.add_widget(b_revert)
+        
+        b_load = GlossyButton("📂 Yükle (CSV)")
+        b_load.clicked.connect(self.load_csv_dialog)
+        p2.add_widget(b_load)
+
+        b_export_mat = GlossyButton("📤 Matris Çıktısı (CSV)")
+        b_export_mat.clicked.connect(self.export_matrix_dialog)
+        p2.add_widget(b_export_mat)
+        
+        l.addWidget(p2)
+        
+        p3 = Panel("Algoritmalar")
+        
+        b_algo1 = GlossyButton("BFS / DFS")
+        b_algo1.clicked.connect(lambda: self.run_algo_dialog("bfs_dfs"))
+        p3.add_widget(b_algo1)
+        
+        b_algo2 = GlossyButton("En Kısa Yol")
+        b_algo2.clicked.connect(self.open_dijkstra)
+        p3.add_widget(b_algo2)
+        
+        b_algo3 = GlossyButton("Topluluk Analizi")
+        b_algo3.clicked.connect(self.show_components)
+        p3.add_widget(b_algo3)
+        
+        b_algo4 = GlossyButton("Merkezilik Analizi")
+        b_algo4.clicked.connect(self.show_top5)
+        p3.add_widget(b_algo4)
+        
+        b_algo4.clicked.connect(self.show_top5)
+        p3.add_widget(b_algo4)
+        
+        b_dash = GlossyButton("📊 Detaylı Analiz Panosu")
+        b_dash.clicked.connect(self.open_dashboard)
+        p3.add_widget(b_dash)
+        
+        l.addWidget(p3)
+        
+        l.addStretch()
+        parent_layout.addWidget(container)
+
+    def create_center_col(self, parent_layout):
+        container = QWidget()
+        l = QVBoxLayout(container)
+        l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(10)
+        
+        self.scene = QGraphicsScene()
+        self.scene.setBackgroundBrush(QBrush(QColor(COLORS["background"])))
+        self.scene.selectionChanged.connect(self.on_selection_changed)
+        self.view = ZoomableGraphicsView(self.scene)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.view.setStyleSheet(f"background-color: {COLORS['background']}; border: none; border-radius: 8px;")
+        l.addWidget(self.view, stretch=2)
+        
+        bottom_container = QWidget()
+        bottom_container.setFixedHeight(280)
+        bl = QHBoxLayout(bottom_container)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(10)
+        
+        self.panel_results = Panel("Sonuçlar")
+        self.res_table = QTableWidget(5, 2)
+        self.res_table.setHorizontalHeaderLabels(["Key", "Value"])
+        self.res_table.horizontalHeader().setStretchLastSection(True)
+        self.res_table.horizontalHeader().setVisible(False) # Clean look
+        self.res_table.setStyleSheet(TABLE_STYLE)
+        self.panel_results.add_widget(self.res_table)
+        bl.addWidget(self.panel_results, stretch=1)
+        
+        self.panel_settings = Panel("Algoritma Ayarları")
+        
+        self.panel_settings.add_widget(QLabel("Algoritma:"))
+        self.algo_combo = QComboBox()
+        self.algo_combo.addItems(["Dijkstra", "A*", "BFS", "DFS"])
+        self.algo_combo.setStyleSheet(INPUT_STYLE)
+        self.panel_settings.add_widget(self.algo_combo)
+
+        self.panel_settings.add_widget(QLabel("Başlangıç ID:"))
+        self.inp_start = QLineEdit()
+        self.inp_start.setPlaceholderText("Seçili veya ID (Örn: 1)")
+        self.inp_start.setStyleSheet(INPUT_STYLE)
+        self.panel_settings.add_widget(self.inp_start)
+
+        self.inp_target = QLineEdit()
+        self.inp_target.setPlaceholderText("Node ID (Örn: 5)")
+        self.inp_target.setStyleSheet(INPUT_STYLE)
+        self.panel_settings.add_widget(QLabel("Hedef:"))
+        self.panel_settings.add_widget(self.inp_target)
+
+        self.btn_run_algo = GlossyButton("🚀 Çalıştır")
+        self.btn_run_algo.clicked.connect(self.run_algorithm_settings)
+        self.panel_settings.add_widget(self.btn_run_algo)
+        
+        bl.addWidget(self.panel_settings, stretch=1)
+        
+        self.panel_color = Panel("Graf Renklendirme")
+        self.panel_color.add_widget(QLabel("Topluluk Tespiti ve Renklendirme"))
+        
+        dots = QLabel("🔴 🔵 🟢 🟡")
+        dots.setAlignment(Qt.AlignCenter)
+        dots.setStyleSheet("font-size: 20px; padding: 10px;")
+        self.panel_color.add_widget(dots)
+        
+        btn_clr = GlossyButton("Renklendir")
+        btn_clr.clicked.connect(self.run_coloring)
+        self.panel_color.add_widget(btn_clr)
+        bl.addWidget(self.panel_color, stretch=1)
+
+        l.addWidget(bottom_container)
+        parent_layout.addWidget(container, stretch=1)
+
+    def create_right_col(self, parent_layout):
+        container = QWidget()
+        container.setFixedWidth(300)
+        l = QVBoxLayout(container)
+        l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(10)
+        
+        self.p_inspector = Panel("Düğüm Bilgisi")
+        self.lbl_insp_id = QLabel("Seçili: Yok")
+        self.lbl_insp_id.setStyleSheet(f"font-size: 14px; color: {COLORS['accent_green']}; font-weight: bold;")
+        self.p_inspector.add_widget(self.lbl_insp_id)
+        
+        self.edit_name = QLineEdit()
+        self.edit_name.setPlaceholderText("Kullanıcı Adı")
+        self.edit_name.setStyleSheet(INPUT_STYLE)
+        self.p_inspector.add_widget(QLabel("Adı:"))
+        self.p_inspector.add_widget(self.edit_name)
+        
+        self.edit_act = QLineEdit()
+        self.edit_act.setPlaceholderText("Aktiflik (0-1)")
+        self.edit_act.setStyleSheet(INPUT_STYLE)
+        self.p_inspector.add_widget(QLabel("Aktiflik:"))
+        self.p_inspector.add_widget(self.edit_act)
+        
+        self.edit_int = QLineEdit()
+        self.edit_int.setPlaceholderText("Etkileşim")
+        self.edit_int.setStyleSheet(INPUT_STYLE)
+        self.p_inspector.add_widget(QLabel("Etkileşim:"))
+        self.p_inspector.add_widget(self.edit_int)
+        
+        btn_save = QPushButton("Güncelle")
+        btn_save.setStyleSheet(f"background-color: {COLORS['accent_blue']}; color: white; border-radius: 4px; padding: 6px;")
+        btn_save.clicked.connect(self.save_node_edit)
+        self.p_inspector.layout_main.addWidget(btn_save)
+
+        l.addWidget(self.p_inspector)
+        
+        self.p_stats = Panel("İstatistikler")
+        
+        self.lbl_stat_nodes = QLabel("Toplam Node: 0")
+        self.lbl_stat_edges = QLabel("Toplam Edge: 0")
+        self.lbl_stat_density = QLabel("Yoğunluk: 0.00")
+        
+        for lbl in [self.lbl_stat_nodes, self.lbl_stat_edges, self.lbl_stat_density]:
+            lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 13px; margin-left: 5px;")
+            self.p_stats.add_widget(lbl)
+            
+        l.addWidget(self.p_stats)
+        
+        p_perf = Panel("Performans")
+        self.lbl_perf_time = QLabel("Çalışma Süresi: -")
+        p_perf.add_widget(self.lbl_perf_time)
+        l.addWidget(p_perf)
+        
+        l.addStretch()
+        parent_layout.addWidget(container)
+
+    
+    def update_stats(self):
+        n = len(self.graph.nodes)
+        m = len(self.graph.edges)
+        
+        self.lbl_stat_nodes.setText(f"Toplam Node: {n}")
+        self.lbl_stat_edges.setText(f"Toplam Edge: {m}")
+        
+        density = 0
+        if n > 1:
+            density = (2 * m) / (n * (n - 1))
+        
+        self.lbl_stat_density.setText(f"Yoğunluk: {density:.4f}")
+
+    def draw_graph(self):
+        self.scene.clear()
+        self.update_stats()
+        
+        nodes = self.graph.nodes
+        n = len(nodes)
+        
+        colors = {}
+        if self.is_colored:
+            try:
+                colors = self.graph.welsh_powell()
+            except:
+                colors = {}
+        
+        palette = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#073b4c"]
+        default_color = "#0ea5e9" 
+
+        if n == 0: return
+
+        
+        layout_positions = self.graph.spring_layout(width=2000, height=2000, iterations=80)
+        
+        positions = {}
+        for nid, (lx, ly) in layout_positions.items():
+             positions[nid] = QPointF(lx, ly)
+
+       
+        for e in self.graph.edges:
+            if e.weight < self.community_threshold:
+                continue
+                
+            if e.source in positions and e.target in positions:
+                ec = None
+                if (e.source, e.target) in self.highlight_edges or (e.target, e.source) in self.highlight_edges:
+                    ec = "#10b981" # Green
+                self.scene.addItem(EdgeItem(e, positions[e.source], positions[e.target], color=ec))
+                
+       
+        for node in nodes:
+            if node.id in positions:
+                c = default_color
+                if self.is_colored:
+                     c = palette[colors.get(node.id, 0) % len(palette)]
+                
+               
+                if node.id in self.highlight_nodes:
+                    c = "#10b981" # Green
+                    
+                self.scene.addItem(NodeItem(node, positions[node.id].x(), positions[node.id].y(), color=c))
+
+        self.scene.setSceneRect(self.scene.itemsBoundingRect())
+        self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+
+    def on_selection_changed(self):
+        items = self.scene.selectedItems()
+        if not items:
+            self.lbl_insp_id.setText("Seçili: Yok")
+            self.current_node_id = None
+            return
+        
+        for item in items:
+            if isinstance(item, NodeItem):
+                n = item.node
+                self.current_node_id = n.id
+                self.lbl_insp_id.setText(f"Kullanıcı ID: {n.id}")
+                self.edit_name.setText(n.name)
+                self.edit_act.setText(str(n.aktiflik))
+                self.edit_int.setText(str(n.etkilesim))
+                break
+
+    def save_node_edit(self):
+        if not hasattr(self, 'current_node_id') or self.current_node_id is None:
+            return
+        
+        try:
+            nid = self.current_node_id
+            name = self.edit_name.text()
+            act = float(self.edit_act.text())
+            inter = int(self.edit_int.text())
+            
+            self.graph.update_node(nid, name=name, aktiflik=act, etkilesim=inter)
+            self.draw_graph()
+            
+            for item in self.scene.items():
+                if isinstance(item, NodeItem) and item.node.id == nid:
+                    item.setSelected(True)
+                    break
+
+            QMessageBox.information(self, "Başarılı", "Güncellendi")
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+   
+    
+    def run_algo_dialog(self, type):
+        dlg = TraverseDialog(self.graph)
+        if dlg.exec_():
+            sid, algo = dlg.get_data()
+            if sid is not None:
+                self.display_algorithm_results(algo, sid)
+            
+            
+        
+    def show_top5(self):
+        res = self.graph.degree_centrality_top5()
+        self.res_table.setRowCount(len(res))
+        for i, (nid, d) in enumerate(res):
+            self.res_table.setItem(i, 0, QTableWidgetItem(str(nid)))
+            self.res_table.setItem(i, 1, QTableWidgetItem(str(d)))
+            
+    def run_coloring(self):
+        self.draw_graph()
+
+    def run_algorithm_settings(self):
+        try:
+            
+            start_id = None
+            inp_sid_str = self.inp_start.text().strip()
+            if inp_sid_str.isdigit():
+                start_id = int(inp_sid_str)
+            elif hasattr(self, 'current_node_id') and self.current_node_id is not None:
+                start_id = self.current_node_id
+            
+            if start_id is None:
+                QMessageBox.warning(self, "Uyarı", "Lütfen bir başlangıç düğümü seçin veya ID girin.")
+                return
+
+            algo_type = self.algo_combo.currentText()
+            
+            target_str = self.inp_target.text().strip()
+            target_id = int(target_str) if target_str.isdigit() else None
+            
+            self.display_algorithm_results(algo_type, start_id, target_id)
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+    def display_algorithm_results(self, algo_type, start_id, target_id=None):
+        import time
+        t_start = time.perf_counter()
+        
+        try:
+            result_msg = ""
+            results_for_table = [] 
+            
+            if algo_type in ["Dijkstra", "A*"]:
+                if target_id is None:
+                    QMessageBox.warning(self, "Uyarı", f"{algo_type} için Hedef Node ID giriniz.")
+                    return
+                
+                if algo_type == "Dijkstra":
+                    path, cost = self.graph.dijkstra(start_id, target_id)
+                    title = "Dijkstra"
+                else: 
+                    path, cost = self.graph.astar(start_id, target_id)
+                    title = "A*"
+                
+                result_msg = f"{title} Sonuç:\nYol: {path}\nMaliyet: {cost:.2f}"
+                
+                self.highlight_nodes = set(path)
+                self.highlight_edges = set()
+                for i in range(len(path)-1):
+                    self.highlight_edges.add((path[i], path[i+1]))
+                self.draw_graph()
+
+                results_for_table.append(("Algoritma", title))
+                results_for_table.append(("Maliyet", f"{cost:.2f}"))
+                results_for_table.append(("Adım Sayısı", str(len(path))))
+                for i, node_id in enumerate(path):
+                    results_for_table.append((f"Adım {i+1}", f"Node {node_id}"))
+                    
+            elif algo_type in ["BFS", "DFS"]:
+                if algo_type == "BFS":
+                    res = self.graph.bfs(start_id)
+                else:
+                    res = self.graph.dfs(start_id)
+                
+                result_msg = f"{algo_type} Ziyaret Sırası:\n{res}"
+                
+                self.highlight_nodes = set(res)
+                self.highlight_edges = set() 
+                
+                self.draw_graph()
+                
+                results_for_table.append(("Algoritma", algo_type))
+                results_for_table.append(("Toplam Node", str(len(res))))
+                for i, node_id in enumerate(res):
+                    results_for_table.append((f"{i+1}. Sıra", f"Node {node_id}"))
+
+            self.res_table.setRowCount(len(results_for_table))
+            for i, (key, val) in enumerate(results_for_table):
+                self.res_table.setItem(i, 0, QTableWidgetItem(str(key)))
+                self.res_table.setItem(i, 1, QTableWidgetItem(str(val)))
+
+            t_end = time.perf_counter()
+            duration_ms = (t_end - t_start) * 1000.0
+            self.lbl_perf_time.setText(f"Çalışma Süresi: {duration_ms:.4f} ms")
+
+            
+            QMessageBox.information(self, "Sonuç", result_msg)
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+
+        
+    def save_graph(self):
+        self.graph.save_to_json(self.graph.data_path)
+        QMessageBox.information(self, "Kayıt", "Kaydedildi.")
+
+    def open_dashboard(self):
+        try:
+            
+            if self.page_dashboard_container.layout().count() > 0:
+                item = self.page_dashboard_container.layout().takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            
+            self.dashboard = DashboardWidget(self.graph)
+            self.dashboard.back_clicked.connect(self.close_dashboard)
+            self.page_dashboard_container.layout().addWidget(self.dashboard)
+            
+            self.stack.setCurrentIndex(1)
+            
+        except Exception as e:
+             QMessageBox.warning(self, "Hata", str(e))
+
+    def close_dashboard(self):
+        self.stack.setCurrentIndex(0)
+
+    def revert_graph(self):
+        try:
+            if not os.path.exists(self.graph.data_path):
+                QMessageBox.warning(self, "Hata", "Kayıtlı dosya bulunamadı.")
+                return
+            
+            self.graph.load_from_json(self.graph.data_path)
+            self.is_colored = False
+            self.community_threshold = 0.0
+            self.highlight_nodes.clear()
+            self.highlight_edges.clear()
+            self.draw_graph()
+            QMessageBox.information(self, "Başarılı", "Son kaydedilen duruma geri dönüldü.")
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+    def load_csv_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(self, "CSV Yükle", "", "CSV Files (*.csv)")
+        if path:
+            try:
+                self.graph.load_from_csv(path)
+                self.is_colored = False
+                self.community_threshold = 0.0 
+                self.highlight_nodes.clear()
+                self.highlight_edges.clear()
+                self.draw_graph()
+                QMessageBox.information(self, "Başarılı", "Graf CSV'den yüklendi.")
+            except Exception as e:
+                QMessageBox.warning(self, "Hata", str(e))
+
+    def export_matrix_dialog(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Matris Kaydet", "adjacency_matrix.csv", "CSV Files (*.csv)")
+        if path:
+            try:
+                self.graph.export_adjacency_matrix(path)
+                QMessageBox.information(self, "Başarılı", "Komşuluk matrisi kaydedildi.")
+            except Exception as e:
+                QMessageBox.warning(self, "Hata", str(e))
+
+    def open_add_node(self):
+        if AddNodeDialog(self.graph).exec_(): self.draw_graph()
+    def open_delete_node(self):
+        if DeleteNodeDialog(self.graph).exec_(): self.draw_graph()
+    def open_add_edge(self):
+        if AddEdgeDialog(self.graph).exec_(): self.draw_graph()
+    def open_delete_edge(self):
+        if DeleteEdgeDialog(self.graph).exec_(): self.draw_graph()
+    def open_dijkstra(self):
+         dlg = DijkstraDialog()
+         if dlg.exec_():
+             s, t = dlg.get_data()
+             if s is not None and t is not None:
+                 self.display_algorithm_results("Dijkstra", s, t)
+             else:
+                 QMessageBox.warning(self, "Hata", "Lütfen geçerli sayısal ID'ler giriniz.")
+    def show_components(self):
+        dlg = ThresholdDialog()
+        if dlg.exec_():
+            thresh = dlg.get_value()
+            self.community_threshold = thresh
+            
+            comps = self.graph.connected_components(thresh)
+            
+            self.res_table.setRowCount(len(comps))
+            for i, c in enumerate(comps):
+                 self.res_table.setItem(i, 0, QTableWidgetItem(f"Grup {i+1}"))
+                 self.res_table.setItem(i, 1, QTableWidgetItem(str(c)))
+            
+            # Update visualization to show disconnected components / filtered edges
+            self.draw_graph()
+            QMessageBox.information(self, "Analiz Tamamlandı", f"{len(comps)} adet topluluk bulundu.\nTablo güncellendi.\nGrafik eşik değerine göre filtrelendi.")
+
+    def run_coloring(self):
+        try:
+            colors = self.graph.welsh_powell(self.community_threshold)
+            if not colors:
+                QMessageBox.information(self, "Bilgi", "Renklendirilecek düğüm yok.")
+                return
+
+            self.is_colored = True
+            
+            self.highlight_nodes.clear()
+            self.highlight_edges.clear()
+
+            chromatic_number = max(colors.values()) + 1
+            
+            palette_names = ["Kırmızı", "Sarı", "Yeşil", "Mavi", "Koyu Lacivert"]
+
+            total_rows = 2 + 1 + len(colors) 
+            self.res_table.setRowCount(total_rows)
+            
+            self.res_table.setItem(0, 0, QTableWidgetItem("Algoritma"))
+            self.res_table.setItem(0, 1, QTableWidgetItem("Welsh-Powell"))
+            
+            self.res_table.setItem(1, 0, QTableWidgetItem("Kromatik Sayı"))
+            self.res_table.setItem(1, 1, QTableWidgetItem(str(chromatic_number)))
+            
+            header_item = QTableWidgetItem("--- Detaylar ---")
+            header_item.setBackground(QColor(COLORS['panel']))
+            header_item.setForeground(QColor(COLORS['accent_cyan']))
+            self.res_table.setItem(2, 0, header_item)
+            self.res_table.setItem(2, 1, QTableWidgetItem(""))
+
+            sorted_items = sorted(colors.items(), key=lambda x: (x[1], x[0]))
+            
+            for i, (nid, c_idx) in enumerate(sorted_items):
+                row = 3 + i
+                color_name = palette_names[c_idx % len(palette_names)]
+                self.res_table.setItem(row, 0, QTableWidgetItem(f"Node {nid}"))
+                self.res_table.setItem(row, 1, QTableWidgetItem(f"{color_name} (Kod: {c_idx})"))
+            
+            self.draw_graph()
+            
+            QMessageBox.information(self, "Başarılı", f"Graf renklendirildi.\nKromatik Sayı: {chromatic_number}\nDetaylar tabloda listelendi.")
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+
+class BaseDialog(QDialog):
+    def __init__(self): 
+        super().__init__()
+        self.setStyleSheet(f"""
+            QDialog {{ background-color: {COLORS["panel"]}; border: 1px solid {COLORS["border"]}; }}
+            QLabel {{ color: {COLORS["text"]}; font-size: 13px; font-weight: bold; margin-bottom: 2px; }}
+            QLineEdit {{ 
+                background-color: {COLORS["input_bg"]}; 
+                border: 1px solid {COLORS["border"]}; 
+                border-radius: 4px; 
+                color: {COLORS["text"]}; 
+                padding: 6px; 
+                min-height: 20px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {COLORS["accent_cyan"]}; }}
+            QPushButton {{ 
+                background-color: {COLORS["accent_blue"]}; 
+                color: {COLORS["background"]}; 
+                border-radius: 4px; 
+                padding: 8px; 
+                font-weight: bold;
+                margin-top: 10px;
+            }}
+            QPushButton:hover {{ background-color: {COLORS["accent_cyan"]}; }}
+            QComboBox {{
+                background-color: {COLORS["input_bg"]};
+                border: 1px solid {COLORS["border"]};
+                color: {COLORS["text"]};
+                padding: 5px;
+            }}
+        """) 
+class AddNodeDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__();
+        self.g=g; self.setWindowTitle("Ekle")
+        l=QVBoxLayout(self); 
+        self.inputs=[QLineEdit() for _ in range(4)]
+        labels=["ID","Ad","Aktiflik","Etkileşim"]
+        for i,lb in enumerate(labels): l.addWidget(QLabel(lb)); l.addWidget(self.inputs[i])
+        b=QPushButton("Ekle"); b.clicked.connect(self.act); l.addWidget(b)
+    def act(self):
+        try: 
+            self.g.add_node(Node(int(self.inputs[0].text()), self.inputs[1].text(), float(self.inputs[2].text()), int(self.inputs[3].text())))
+            self.accept()
+        except Exception as e: QMessageBox.warning(self,"Hata",str(e))
+
+class DeleteNodeDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__(); self.g=g; self.setWindowTitle("Sil"); l=QVBoxLayout(self)
+        self.i=QLineEdit(); l.addWidget(QLabel("ID")); l.addWidget(self.i); 
+        b=QPushButton("Sil"); b.clicked.connect(lambda: (self.g.remove_node(int(self.i.text())), self.accept())); l.addWidget(b)
+
+class AddEdgeDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__(); self.g=g; self.setWindowTitle("Edge Ekle"); l=QVBoxLayout(self)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("1. ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("2. ID")); l.addWidget(self.i2)
+        b=QPushButton("Ekle"); b.clicked.connect(lambda: (self.g.add_edge(int(self.i1.text()), int(self.i2.text())), self.accept())); l.addWidget(b)
+
+class DeleteEdgeDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__(); self.g=g; self.setWindowTitle("Edge Sil"); l=QVBoxLayout(self)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("1. ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("2. ID")); l.addWidget(self.i2)
+        b=QPushButton("Sil"); b.clicked.connect(lambda: (self.g.remove_edge(int(self.i1.text()), int(self.i2.text())), self.accept())); l.addWidget(b)
+
+class ThresholdDialog(BaseDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Topluluk Analizi Parametreleri")
+        l = QVBoxLayout(self)
+        l.addWidget(QLabel("Benzerlik Eşik Değeri (Threshold)"))
+        self.inp = QLineEdit()
+        self.inp.setPlaceholderText("0.0 - 1.0 arası (Örn: 0.5)")
+        self.inp.setText("0.0")
+        l.addWidget(self.inp)
+        
+        l.addWidget(QLabel("Açıklama: Bu değerden DÜŞÜK ağırlıklı kenarlar koparılır."))
+        
+        b = GlossyButton("Analiz Et")
+        b.clicked.connect(self.accept)
+        l.addWidget(b)
+        
+    def get_value(self):
+        try:
+            return float(self.inp.text())
+        except:
+            return 0.0
+
+class DijkstraDialog(BaseDialog):
+    def __init__(self):
+        super().__init__(); self.setWindowTitle("Dijkstra"); l=QVBoxLayout(self)
+        self.i1=QLineEdit(); self.i2=QLineEdit()
+        l.addWidget(QLabel("Başlangıç ID")); l.addWidget(self.i1)
+        l.addWidget(QLabel("Bitiş ID")); l.addWidget(self.i2)
+        b=QPushButton("Hesapla"); b.clicked.connect(self.accept); l.addWidget(b)
+    def get_data(self):
+        try: return int(self.i1.text()), int(self.i2.text())
+        except: return None, None
+
+class TraverseDialog(BaseDialog):
+    def __init__(self, g):
+        super().__init__()
+        self.g = g
+        self.setWindowTitle("BFS / DFS")
+        self.layout_main = QVBoxLayout(self)
+        
+        self.layout_main.addWidget(QLabel("Başlangıç Node ID:"))
+        self.inp_start = QLineEdit()
+        self.inp_start.setPlaceholderText("ID giriniz (örn: 1)")
+        self.inp_start.setStyleSheet(INPUT_STYLE)
+        self.layout_main.addWidget(self.inp_start)
+        
+        self.layout_main.addWidget(QLabel("Algoritma:"))
+        self.cb_algo = QComboBox()
+        self.cb_algo.addItems(["BFS", "DFS"])
+        self.cb_algo.setStyleSheet(INPUT_STYLE)
+        self.layout_main.addWidget(self.cb_algo)
+        
+        btn = QPushButton("Çalıştır")
+        btn.setStyleSheet(BUTTON_STYLE)
+        btn.clicked.connect(self.run_algo)
+        self.layout_main.addWidget(btn)
+        
+        self.data_out = (None, None)
+        
+    def run_algo(self):
+        try:
+            sid = int(self.inp_start.text())
+            algo = self.cb_algo.currentText()
+            self.data_out = (sid, algo)
+            self.accept()
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+            
+    def get_data(self):
+        return self.data_out
+
+
+class ZoomableGraphicsView(QGraphicsView):
+    def __init__(self, scene):
+        super().__init__(scene)
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        self._panning = False
+        self._pan_start = QPointF(0, 0)
+
+    def drawBackground(self, painter, rect):
+        super().drawBackground(painter, rect)
+        
+        grid_size = 40
+        grid_color = QColor(255, 255, 255, 30) 
+        
+        painter.setPen(QPen(grid_color, 1))
+        
+        l = int(rect.left())
+        r = int(rect.right())
+        t = int(rect.top())
+        b = int(rect.bottom())
+        
+        start_x = l - (l % grid_size)
+        start_y = t - (t % grid_size)
+        
+        for x in range(start_x, r, grid_size):
+            painter.drawLine(x, t, x, b)
+            
+        for y in range(start_y, b, grid_size):
+            painter.drawLine(l, y, r, y)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton or event.button() == Qt.MiddleButton:
+            self._panning = True
+            self._pan_start = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._panning:
+            delta = event.pos() - self._pan_start
+            self._pan_start = event.pos()
+            
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.RightButton or event.button() == Qt.MiddleButton:
+            self._panning = False
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        zoom_in_factor = 1.25
+        zoom_out_factor = 1 / zoom_in_factor
+
+        old_pos = self.mapToScene(event.pos())
+
+        if event.angleDelta().y() > 0:
+            zoom_factor = zoom_in_factor
+        else:
+            zoom_factor = zoom_out_factor
+        
+        self.scale(zoom_factor, zoom_factor)
+
+        new_pos = self.mapToScene(event.pos())
+
+        delta = new_pos - old_pos
+        self.translate(delta.x(), delta.y())
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setStyleSheet(MAIN_APP_STYLE) 
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
+
+
+
+
+--------------------- node.py -------------------
+
+class Node:
+    def __init__(
+        self,
+        node_id,
+        name,
+        aktiflik=0.0,
+        etkilesim=0.0,
+        baglanti_sayisi=0,
+        komsular=None
+    ):
+        self.id = node_id
+        self.name = name
+
+        self.aktiflik = aktiflik
+        self.etkilesim = etkilesim
+        self.baglanti_sayisi = baglanti_sayisi
+
+        if komsular is None:
+            self.komsular = []
+        else:
+            self.komsular = list(komsular)
+
+    
+    def komsu_ekle(self, node_id):
+        if node_id not in self.komsular:
+            self.komsular.append(node_id)
+            self.baglanti_sayisi = len(self.komsular)
+
+    def komsu_sil(self, node_id):
+        if node_id in self.komsular:
+            self.komsular.remove(node_id)
+            self.baglanti_sayisi = len(self.komsular)
+
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "aktiflik": self.aktiflik,
+            "etkilesim": self.etkilesim,
+            "baglanti_sayisi": self.baglanti_sayisi,
+            "komsular": self.komsular
+        }
+
+    @staticmethod
+    def from_dict(data):
+        return Node(
+            node_id=data["id"],
+            name=data["name"],
+            aktiflik=data.get("aktiflik", 0.0),
+            etkilesim=data.get("etkilesim", 0.0),
+            baglanti_sayisi=data.get("baglanti_sayisi", 0),
+            komsular=data.get("komsular", [])
+        )
+
+    
+    def __repr__(self):
+        return (
+            f"Node(id={self.id}, name='{self.name}', "
+            f"aktiflik={self.aktiflik}, etkilesim={self.etkilesim}, "
+            f"baglanti_sayisi={self.baglanti_sayisi})"
+        )
+
+
+----------------------- stysles.py --------------------------
+
+
+
+COLORS = {
+    "background": "#0b1622",      # Deep Midnight
+    "panel": "#111f2e",           # Panel Background
+    "header": "#081018",          # Header Background
+    "border": "#2c3e50",          # Borders
+    "text": "#e2e8f0",            # Primary Text (Light Grey)
+    "text_muted": "#64748b",      # Muted Text
+    "accent_blue": "#0ea5e9",     # Sky Blue (Icons/Highlights)
+    "accent_cyan": "#06b6d4",     # Cyan
+    "accent_green": "#10b981",    # Success
+    "glass_bg": "rgba(255, 255, 255, 0.03)", 
+    "glass_border": "rgba(255, 255, 255, 0.08)",
+    "input_bg": "#0f2336"
+}
+
+
+
+MAIN_APP_STYLE = f"""
+    QMainWindow {{
+        background-color: {COLORS["background"]};
+    }}
+    QWidget {{
+        font-family: 'Segoe UI', 'Roboto', sans-serif;
+        color: {COLORS["text"]};
+        font-size: 12px;
+    }}
+    QScrollBar:vertical {{
+        background: {COLORS["background"]};
+        width: 8px;
+        margin: 0px 20px 0 20px;
+    }}
+    QScrollBar::handle:vertical {{
+        background: {COLORS["border"]};
+        min-height: 20px;
+        border-radius: 4px;
+    }}
+    QDialog {{
+        background-color: {COLORS["panel"]};
+        border: 1px solid {COLORS["border"]};
+    }}
+    QMessageBox {{
+        background-color: {COLORS["panel"]};
+        border: 1px solid {COLORS["glass_border"]};
+    }}
+    QMessageBox QLabel {{
+        color: {COLORS["text"]};
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 13px;
+        background-color: transparent;
+    }}
+    QMessageBox QPushButton {{
+        background-color: {COLORS["input_bg"]};
+        color: {COLORS["text"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        padding: 6px 20px;
+        min-width: 80px;
+    }}
+    QMessageBox QPushButton:hover {{
+        background-color: {COLORS["border"]};
+        border: 1px solid {COLORS["accent_blue"]};
+        color: white;
+    }}
+"""
+
+PANEL_STYLE = f"""
+    QFrame#Panel {{
+        background-color: {COLORS["panel"]};
+        border: 1px solid {COLORS["glass_border"]};
+        border-radius: 8px;
+    }}
+    QLabel#PanelTitle {{
+        color: {COLORS["accent_blue"]};
+        font-weight: bold;
+        font-size: 13px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid {COLORS["glass_border"]};
+    }}
+    QFrame#Panel QLabel {{
+        margin-top: 2px;
+    }}
+"""
+
+HEADER_STYLE = f"""
+    QFrame#Header {{
+        background-color: {COLORS["header"]};
+        border-bottom: 1px solid {COLORS["border"]};
+    }}
+    QLabel#AppTitle {{
+        color: {COLORS["text"]};
+        font-size: 18px;
+        font-weight: bold;
+        padding-left: 10px;
+    }}
+"""
+
+BUTTON_STYLE = f"""
+    QPushButton {{
+        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a2736, stop:1 #0f1924);
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        color: {COLORS["text"]};
+        padding: 8px 10px;
+        text-align: left;
+    }}
+    QPushButton:hover {{
+        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #253344, stop:1 #1a2736);
+        border: 1px solid {COLORS["accent_blue"]};
+        color: white;
+    }}
+    QPushButton:pressed {{
+        background-color: {COLORS["accent_blue"]};
+        color: black;
+    }}
+"""
+
+INPUT_STYLE = f"""
+    QLineEdit, QComboBox {{
+        background-color: {COLORS["input_bg"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        color: {COLORS["text"]};
+        padding: 4px 6px;
+        min-height: 20px;
+        font-size: 12px;
+        margin-bottom: 2px;
+    }}
+    QLineEdit:focus, QComboBox:focus {{
+        border: 1px solid {COLORS["accent_cyan"]};
+    }}
+    QComboBox::drop-down {{
+        border: none;
+        width: 15px;
+    }}
+    QComboBox QAbstractItemView {{
+        background-color: {COLORS["background"]};
+        color: {COLORS["text"]};
+        selection-background-color: {COLORS["accent_blue"]};
+        selection-color: white;
+        border: 1px solid {COLORS["border"]};
+    }}
+"""
+
+TABLE_STYLE = f"""
+    QTableWidget {{
+        background-color: {COLORS["input_bg"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 4px;
+        gridline-color: {COLORS["border"]};
+    }}
+    QHeaderView::section {{
+        background-color: {COLORS["panel"]};
+        color: {COLORS["text_muted"]};
+        border: none;
+        padding: 4px;
+    }}
+"""
+
+
+
+------------------------ test_edge.py -------------------
+
+from edge import Edge
+
+e = Edge(1, 2, 0.85)
+print(e)
+
+print(e.matches(1, 2))  # True
+print(e.matches(2, 1))  # True
+print(e.matches(1, 3))  # False
+
+
+
+------------------------ graph.json ------------------------
+
+
+{
+    "nodes": [
+        {
+            "id": 1,
+            "name": "Node 1",
+            "aktiflik": 0.98,
+            "etkilesim": 73,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                2,
+                40,
+                5,
+                20
+            ]
+        },
+        {
+            "id": 2,
+            "name": "Node 2",
+            "aktiflik": 0.87,
+            "etkilesim": 94,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                1,
+                3,
+                12
+            ]
+        },
+        {
+            "id": 3,
+            "name": "Node 3",
+            "aktiflik": 0.43,
+            "etkilesim": 1,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                2,
+                4,
+                13
+            ]
+        },
+        {
+            "id": 4,
+            "name": "Node 4",
+            "aktiflik": 0.71,
+            "etkilesim": 47,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                3,
+                5,
+                14
+            ]
+        },
+        {
+            "id": 5,
+            "name": "Node 5",
+            "aktiflik": 0.41,
+            "etkilesim": 62,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                4,
+                6,
+                1,
+                10,
+                25
+            ]
+        },
+        {
+            "id": 6,
+            "name": "Node 6",
+            "aktiflik": 0.88,
+            "etkilesim": 87,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                5,
+                7,
+                16
+            ]
+        },
+        {
+            "id": 7,
+            "name": "Node 7",
+            "aktiflik": 0.27,
+            "etkilesim": 14,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                6,
+                8,
+                17
+            ]
+        },
+        {
+            "id": 8,
+            "name": "Node 8",
+            "aktiflik": 0.14,
+            "etkilesim": 81,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                7,
+                9,
+                18
+            ]
+        },
+        {
+            "id": 9,
+            "name": "Node 9",
+            "aktiflik": 0.63,
+            "etkilesim": 26,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                8,
+                10,
+                19
+            ]
+        },
+        {
+            "id": 10,
+            "name": "Node 10",
+            "aktiflik": 0.87,
+            "etkilesim": 87,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                9,
+                11,
+                5,
+                15,
+                30
+            ]
+        },
+        {
+            "id": 11,
+            "name": "Node 11",
+            "aktiflik": 0.18,
+            "etkilesim": 18,
+            "baglanti_sayisi": 2,
+            "komsular": [
+                10,
+                12
+            ]
+        },
+        {
+            "id": 12,
+            "name": "Node 12",
+            "aktiflik": 0.95,
+            "etkilesim": 55,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                11,
+                13,
+                2,
+                22
+            ]
+        },
+        {
+            "id": 13,
+            "name": "Node 13",
+            "aktiflik": 0.94,
+            "etkilesim": 65,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                12,
+                14,
+                3,
+                23
+            ]
+        },
+        {
+            "id": 14,
+            "name": "Node 14",
+            "aktiflik": 0.94,
+            "etkilesim": 32,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                13,
+                15,
+                4,
+                24
+            ]
+        },
+        {
+            "id": 15,
+            "name": "Node 15",
+            "aktiflik": 0.65,
+            "etkilesim": 60,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                14,
+                16,
+                10,
+                20,
+                35
+            ]
+        },
+        {
+            "id": 16,
+            "name": "Node 16",
+            "aktiflik": 0.87,
+            "etkilesim": 89,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                15,
+                17,
+                6,
+                26
+            ]
+        },
+        {
+            "id": 17,
+            "name": "Node 17",
+            "aktiflik": 0.64,
+            "etkilesim": 81,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                16,
+                18,
+                7,
+                27
+            ]
+        },
+        {
+            "id": 18,
+            "name": "Node 18",
+            "aktiflik": 0.35,
+            "etkilesim": 18,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                17,
+                19,
+                8,
+                28
+            ]
+        },
+        {
+            "id": 19,
+            "name": "Node 19",
+            "aktiflik": 0.51,
+            "etkilesim": 17,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                18,
+                20,
+                9,
+                29
+            ]
+        },
+        {
+            "id": 20,
+            "name": "Node 20",
+            "aktiflik": 0.7,
+            "etkilesim": 59,
+            "baglanti_sayisi": 6,
+            "komsular": [
+                19,
+                21,
+                15,
+                25,
+                1,
+                39
+            ]
+        },
+        {
+            "id": 21,
+            "name": "Node 21",
+            "aktiflik": 0.34,
+            "etkilesim": 98,
+            "baglanti_sayisi": 2,
+            "komsular": [
+                20,
+                22
+            ]
+        },
+        {
+            "id": 22,
+            "name": "Node 22",
+            "aktiflik": 0.58,
+            "etkilesim": 24,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                21,
+                23,
+                12,
+                32
+            ]
+        },
+        {
+            "id": 23,
+            "name": "Node 23",
+            "aktiflik": 0.15,
+            "etkilesim": 56,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                22,
+                24,
+                13,
+                33
+            ]
+        },
+        {
+            "id": 24,
+            "name": "Node 24",
+            "aktiflik": 0.77,
+            "etkilesim": 18,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                23,
+                25,
+                14,
+                34
+            ]
+        },
+        {
+            "id": 25,
+            "name": "Node 25",
+            "aktiflik": 0.68,
+            "etkilesim": 26,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                24,
+                26,
+                20,
+                30,
+                5
+            ]
+        },
+        {
+            "id": 26,
+            "name": "Node 26",
+            "aktiflik": 0.31,
+            "etkilesim": 45,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                25,
+                27,
+                16,
+                36
+            ]
+        },
+        {
+            "id": 27,
+            "name": "Node 27",
+            "aktiflik": 0.31,
+            "etkilesim": 42,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                26,
+                28,
+                17,
+                37
+            ]
+        },
+        {
+            "id": 28,
+            "name": "Node 28",
+            "aktiflik": 0.76,
+            "etkilesim": 57,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                27,
+                29,
+                18,
+                38
+            ]
+        },
+        {
+            "id": 29,
+            "name": "Node 29",
+            "aktiflik": 0.57,
+            "etkilesim": 62,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                28,
+                30,
+                19,
+                39
+            ]
+        },
+        {
+            "id": 30,
+            "name": "Node 30",
+            "aktiflik": 0.8,
+            "etkilesim": 34,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                29,
+                31,
+                25,
+                35,
+                10
+            ]
+        },
+        {
+            "id": 31,
+            "name": "Node 31",
+            "aktiflik": 0.17,
+            "etkilesim": 5,
+            "baglanti_sayisi": 2,
+            "komsular": [
+                30,
+                32
+            ]
+        },
+        {
+            "id": 32,
+            "name": "Node 32",
+            "aktiflik": 0.71,
+            "etkilesim": 39,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                31,
+                33,
+                22
+            ]
+        },
+        {
+            "id": 33,
+            "name": "Node 33",
+            "aktiflik": 0.91,
+            "etkilesim": 77,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                32,
+                34,
+                23
+            ]
+        },
+        {
+            "id": 34,
+            "name": "Node 34",
+            "aktiflik": 0.19,
+            "etkilesim": 21,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                33,
+                35,
+                24
+            ]
+        },
+        {
+            "id": 35,
+            "name": "Node 35",
+            "aktiflik": 0.87,
+            "etkilesim": 1,
+            "baglanti_sayisi": 5,
+            "komsular": [
+                34,
+                36,
+                30,
+                40,
+                15
+            ]
+        },
+        {
+            "id": 36,
+            "name": "Node 36",
+            "aktiflik": 0.21,
+            "etkilesim": 5,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                35,
+                37,
+                26
+            ]
+        },
+        {
+            "id": 37,
+            "name": "Node 37",
+            "aktiflik": 0.42,
+            "etkilesim": 42,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                36,
+                38,
+                27
+            ]
+        },
+        {
+            "id": 38,
+            "name": "Node 38",
+            "aktiflik": 0.38,
+            "etkilesim": 82,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                37,
+                39,
+                28
+            ]
+        },
+        {
+            "id": 39,
+            "name": "Node 39",
+            "aktiflik": 0.65,
+            "etkilesim": 50,
+            "baglanti_sayisi": 4,
+            "komsular": [
+                38,
+                40,
+                29,
+                20
+            ]
+        },
+        {
+            "id": 40,
+            "name": "Node 40",
+            "aktiflik": 0.88,
+            "etkilesim": 35,
+            "baglanti_sayisi": 3,
+            "komsular": [
+                39,
+                1,
+                35
+            ]
+        }
+    ],
+    "edges": [
+        {
+            "from": 1,
+            "to": 2,
+            "weight": 5.0
+        },
+        {
+            "from": 2,
+            "to": 3,
+            "weight": 3.0
+        },
+        {
+            "from": 3,
+            "to": 4,
+            "weight": 8.0
+        },
+        {
+            "from": 4,
+            "to": 5,
+            "weight": 2.0
+        },
+        {
+            "from": 5,
+            "to": 6,
+            "weight": 6.0
+        },
+        {
+            "from": 6,
+            "to": 7,
+            "weight": 9.0
+        },
+        {
+            "from": 7,
+            "to": 8,
+            "weight": 1.0
+        },
+        {
+            "from": 8,
+            "to": 9,
+            "weight": 4.0
+        },
+        {
+            "from": 9,
+            "to": 10,
+            "weight": 7.0
+        },
+        {
+            "from": 10,
+            "to": 11,
+            "weight": 3.0
+        },
+        {
+            "from": 11,
+            "to": 12,
+            "weight": 5.0
+        },
+        {
+            "from": 12,
+            "to": 13,
+            "weight": 2.0
+        },
+        {
+            "from": 13,
+            "to": 14,
+            "weight": 8.0
+        },
+        {
+            "from": 14,
+            "to": 15,
+            "weight": 6.0
+        },
+        {
+            "from": 15,
+            "to": 16,
+            "weight": 4.0
+        },
+        {
+            "from": 16,
+            "to": 17,
+            "weight": 9.0
+        },
+        {
+            "from": 17,
+            "to": 18,
+            "weight": 1.0
+        },
+        {
+            "from": 18,
+            "to": 19,
+            "weight": 3.0
+        },
+        {
+            "from": 19,
+            "to": 20,
+            "weight": 7.0
+        },
+        {
+            "from": 20,
+            "to": 21,
+            "weight": 5.0
+        },
+        {
+            "from": 21,
+            "to": 22,
+            "weight": 2.0
+        },
+        {
+            "from": 22,
+            "to": 23,
+            "weight": 6.0
+        },
+        {
+            "from": 23,
+            "to": 24,
+            "weight": 8.0
+        },
+        {
+            "from": 24,
+            "to": 25,
+            "weight": 4.0
+        },
+        {
+            "from": 25,
+            "to": 26,
+            "weight": 9.0
+        },
+        {
+            "from": 26,
+            "to": 27,
+            "weight": 1.0
+        },
+        {
+            "from": 27,
+            "to": 28,
+            "weight": 3.0
+        },
+        {
+            "from": 28,
+            "to": 29,
+            "weight": 0.03840821013899931
+        },
+        {
+            "from": 29,
+            "to": 30,
+            "weight": 0.0012721790098350887
+        },
+        {
+            "from": 30,
+            "to": 31,
+            "weight": 2.0
+        },
+        {
+            "from": 31,
+            "to": 32,
+            "weight": 6.0
+        },
+        {
+            "from": 32,
+            "to": 33,
+            "weight": 8.0
+        },
+        {
+            "from": 33,
+            "to": 34,
+            "weight": 4.0
+        },
+        {
+            "from": 34,
+            "to": 35,
+            "weight": 9.0
+        },
+        {
+            "from": 35,
+            "to": 36,
+            "weight": 1.0
+        },
+        {
+            "from": 36,
+            "to": 37,
+            "weight": 3.0
+        },
+        {
+            "from": 37,
+            "to": 38,
+            "weight": 7.0
+        },
+        {
+            "from": 38,
+            "to": 39,
+            "weight": 5.0
+        },
+        {
+            "from": 39,
+            "to": 40,
+            "weight": 2.0
+        },
+        {
+            "from": 40,
+            "to": 1,
+            "weight": 6.0
+        },
+        {
+            "from": 1,
+            "to": 5,
+            "weight": 3.0
+        },
+        {
+            "from": 5,
+            "to": 10,
+            "weight": 4.0
+        },
+        {
+            "from": 10,
+            "to": 15,
+            "weight": 2.0
+        },
+        {
+            "from": 15,
+            "to": 20,
+            "weight": 7.0
+        },
+        {
+            "from": 20,
+            "to": 25,
+            "weight": 5.0
+        },
+        {
+            "from": 25,
+            "to": 30,
+            "weight": 3.0
+        },
+        {
+            "from": 30,
+            "to": 35,
+            "weight": 8.0
+        },
+        {
+            "from": 35,
+            "to": 40,
+            "weight": 6.0
+        },
+        {
+            "from": 2,
+            "to": 12,
+            "weight": 9.0
+        },
+        {
+            "from": 12,
+            "to": 22,
+            "weight": 1.0
+        },
+        {
+            "from": 22,
+            "to": 32,
+            "weight": 4.0
+        },
+        {
+            "from": 3,
+            "to": 13,
+            "weight": 7.0
+        },
+        {
+            "from": 13,
+            "to": 23,
+            "weight": 5.0
+        },
+        {
+            "from": 23,
+            "to": 33,
+            "weight": 2.0
+        },
+        {
+            "from": 4,
+            "to": 14,
+            "weight": 8.0
+        },
+        {
+            "from": 14,
+            "to": 24,
+            "weight": 6.0
+        },
+        {
+            "from": 24,
+            "to": 34,
+            "weight": 3.0
+        },
+        {
+            "from": 6,
+            "to": 16,
+            "weight": 9.0
+        },
+        {
+            "from": 16,
+            "to": 26,
+            "weight": 1.0
+        },
+        {
+            "from": 26,
+            "to": 36,
+            "weight": 4.0
+        },
+        {
+            "from": 7,
+            "to": 17,
+            "weight": 7.0
+        },
+        {
+            "from": 17,
+            "to": 27,
+            "weight": 5.0
+        },
+        {
+            "from": 27,
+            "to": 37,
+            "weight": 2.0
+        },
+        {
+            "from": 8,
+            "to": 18,
+            "weight": 8.0
+        },
+        {
+            "from": 18,
+            "to": 28,
+            "weight": 6.0
+        },
+        {
+            "from": 28,
+            "to": 38,
+            "weight": 3.0
+        },
+        {
+            "from": 9,
+            "to": 19,
+            "weight": 9.0
+        },
+        {
+            "from": 19,
+            "to": 29,
+            "weight": 0.000493582538550277
+        },
+        {
+            "from": 29,
+            "to": 39,
+            "weight": 0.006896247338048527
+        },
+        {
+            "from": 1,
+            "to": 20,
+            "weight": 5.0
+        },
+        {
+            "from": 20,
+            "to": 39,
+            "weight": 7.0
+        },
+        {
+            "from": 5,
+            "to": 25,
+            "weight": 8.0
+        },
+        {
+            "from": 10,
+            "to": 30,
+            "weight": 2.0
+        },
+        {
+            "from": 15,
+            "to": 35,
+            "weight": 6.0
+        }
+    ]
+}
+
+
+
+
+----------------------------- .gitignore --------------------------
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# UV
+#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#uv.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+#poetry.toml
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
+#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
+#pdm.lock
+#pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
+#pixi.lock
+#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
+#   in the .venv directory. It is recommended not to include this directory in version control.
+.pixi
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+# Abstra
+# Abstra is an AI-powered process automation framework.
+# Ignore directories containing user credentials, local state, and settings.
+# Learn more at https://abstra.io/docs
+.abstra/
+
+# Visual Studio Code
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
+#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  you could uncomment the following to ignore the entire vscode folder
+# .vscode/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Cursor
+#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
+#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
+#  refer to https://docs.cursor.com/context/ignore-files
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
