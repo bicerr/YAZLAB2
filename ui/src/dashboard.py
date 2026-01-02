@@ -11,9 +11,7 @@ from PyQt5.QtCore import Qt, QSize
 
 from ui.src.styles import COLORS, PANEL_STYLE, TABLE_STYLE
 
-# =========================
-# CUSTOM WIDGETS
-# =========================
+
 class MetricCard(QFrame):
     def __init__(self, title, value, subtext="", color=COLORS["accent_blue"]):
         super().__init__()
@@ -53,7 +51,6 @@ class SimpleBarChart(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # Dimensions
         w = self.width()
         h = self.height()
         
@@ -62,7 +59,6 @@ class SimpleBarChart(QWidget):
             painter.drawText(self.rect(), Qt.AlignCenter, "Veri Yok")
             return
 
-        # Find max for formatting
         max_val = max([x[1] for x in self.data]) if self.data else 1
         if max_val == 0: max_val = 1
         
@@ -75,10 +71,8 @@ class SimpleBarChart(QWidget):
         painter.setFont(font)
         
         for label, val in self.data:
-            # Bar Height
             bar_h = (val / max_val) * (h - 40)
             
-            # Setup Gradient Brush
             real_h = int(bar_h) if int(bar_h) > 0 else 1
             rect_x = int(current_x)
             rect_y = int(h - 20 - bar_h)
@@ -90,23 +84,15 @@ class SimpleBarChart(QWidget):
             painter.setBrush(QBrush(gradient))
             painter.setPen(Qt.NoPen)
             
-            # Draw Bar
             
-            # Round rect
+            
             painter.drawRoundedRect(int(rect_x), int(rect_y), int(bar_width), int(bar_h), 4, 4)
             
-            # Draw Label (Bottom)
             painter.setPen(QPen(QColor(COLORS["text_muted"])))
             
-            # Bar Height logic: h - 40 reserved for text/margins
-            # rect_y is top of bar.
-            # Bottom of bar is h - 20.
-            # Text should be at h - 20 + something.
             
-            # Simple center alignment
             painter.drawText(int(rect_x), int(h - 18), int(bar_width), 15, Qt.AlignCenter, str(label))
             
-            # Draw Value (Top)
             painter.setPen(QPen(Qt.white))
             painter.drawText(int(rect_x), int(rect_y - 18), int(bar_width), 15, Qt.AlignCenter, str(val))
             
@@ -127,17 +113,14 @@ class SimpleGauge(QWidget):
         w = self.width()
         h = self.height()
         
-        # Draw Arc
         size = min(w, h) - 40
         x = (w - size) / 2
         y = (h - size) / 2 + 10
         
-        # Background Arc
         pen_bg = QPen(QColor("#1e293b"), 12, Qt.SolidLine, Qt.RoundCap)
         painter.setPen(pen_bg)
         painter.drawArc(int(x), int(y), int(size), int(size), 180 * 16, -180 * 16)
         
-        # Value Arc
         ratio = self.value / self.max_value
         span = int(-180 * ratio * 16)
         
@@ -145,22 +128,17 @@ class SimpleGauge(QWidget):
         painter.setPen(pen_val)
         painter.drawArc(int(x), int(y), int(size), int(size), 180 * 16, span)
         
-        # Text
         painter.setPen(Qt.white)
         font = QFont("Arial", 20, QFont.Bold)
         painter.setFont(font)
         txt = f"{self.value:.2f}"
         painter.drawText(self.rect(), Qt.AlignCenter, txt)
         
-        # Title
         painter.setPen(QColor(COLORS["text_muted"]))
         font2 = QFont("Arial", 10)
         painter.setFont(font2)
         painter.drawText(int(x), int(y + size/2 + 20), int(size), 20, Qt.AlignCenter, self.title)
 
-# =========================
-# DASHBOARD WIDGET
-# =========================
 from PyQt5.QtCore import pyqtSignal
 
 class DashboardWidget(QWidget):
@@ -170,12 +148,10 @@ class DashboardWidget(QWidget):
         super().__init__()
         self.graph = graph
         
-        # Main Layout
         layout_main = QVBoxLayout(self)
         layout_main.setContentsMargins(20, 20, 20, 20)
         layout_main.setSpacing(20)
         
-        # Header Row (Title + Back Button)
         header_layout = QHBoxLayout()
         
         btn_back = QPushButton("<< Geri Dön")
@@ -191,11 +167,9 @@ class DashboardWidget(QWidget):
         header_layout.addStretch()
         layout_main.addLayout(header_layout)
         
-        # --- Top Row: 3 Main Cards ---
         row1 = QHBoxLayout()
         row1.setSpacing(15)
         
-        # Calc Metrics
         node_count = len(graph.nodes)
         edge_count = len(graph.edges)
         
@@ -203,13 +177,11 @@ class DashboardWidget(QWidget):
         if node_count > 1:
             density = (2 * edge_count) / (node_count * (node_count - 1))
             
-        # Card 1: Degree Centrality Chart
         panel_deg = QFrame()
         panel_deg.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
         l_deg = QVBoxLayout(panel_deg)
         l_deg.addWidget(QLabel("Derece Merkeziliği (İlk 10)"))
         
-        # Get Top 10 by Degree
         top_deg = sorted(graph.nodes, key=lambda n: n.baglanti_sayisi, reverse=True)[:10]
         data_deg = [(str(n.id), n.baglanti_sayisi) for n in top_deg]
         
@@ -217,7 +189,7 @@ class DashboardWidget(QWidget):
         l_deg.addWidget(chart_deg)
         row1.addWidget(panel_deg, stretch=2)
         
-        # Card 2: Closeness/Density
+        
         panel_mid = QFrame()
         panel_mid.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
         l_mid = QVBoxLayout(panel_mid)
@@ -227,7 +199,6 @@ class DashboardWidget(QWidget):
         l_mid.addWidget(gauge_density)
         row1.addWidget(panel_mid, stretch=1)
         
-        # Card 3: Basic Metrics
         panel_right = QFrame()
         panel_right.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
         l_right = QVBoxLayout(panel_right)
@@ -240,11 +211,9 @@ class DashboardWidget(QWidget):
         
         layout_main.addLayout(row1, stretch=4)
         
-        # --- Bottom Row: Table + Additional Info ---
         row2 = QHBoxLayout()
         row2.setSpacing(15)
         
-        # Table: En Etkili Aktörler
         panel_table = QFrame()
         panel_table.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
         l_tbl = QVBoxLayout(panel_table)
@@ -269,7 +238,6 @@ class DashboardWidget(QWidget):
         l_tbl.addWidget(table)
         row2.addWidget(panel_table, stretch=2)
         
-        # Side Info: Closeness
         panel_closeness = QFrame()
         panel_closeness.setStyleSheet(f"background-color: {COLORS['panel']}; border-radius: 8px; border: 1px solid {COLORS['glass_border']};")
         l_close = QVBoxLayout(panel_closeness)
@@ -298,9 +266,7 @@ class DashboardWidget(QWidget):
     def emit_back(self):
         self.back_clicked.emit()
 
-# Helper for closeness (simplified Dijkstra that runs until all visited)
 def image_dijkstra_all(graph, start_id):
-    # Just reusing basic logic to get distances
     import heapq
     distances = {node.id: float("inf") for node in graph.nodes}
     distances[start_id] = 0
@@ -322,6 +288,5 @@ def image_dijkstra_all(graph, start_id):
                 distances[v] = distances[u] + cost
                 heapq.heappush(pq, (distances[v], v))
                 
-    # Filter reachable
     reachable = {k: v for k, v in distances.items() if v != float("inf")}
     return None, reachable
